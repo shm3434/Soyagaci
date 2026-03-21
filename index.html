@@ -8,44 +8,101 @@ body {
   font-family: Arial;
   text-align: center;
 }
+
+/* AĞAÇ */
+.tree {
+  display: flex;
+  justify-content: center;
+  margin-top: 50px;
+}
+
 .node {
-  display: inline-block;
+  border: 2px solid black;
   padding: 10px;
   margin: 10px;
-  border: 1px solid black;
+  border-radius: 8px;
   cursor: pointer;
+  background: #fff;
+}
+
+/* BAĞLANTI ÇİZGİLERİ */
+.line {
+  width: 2px;
+  height: 30px;
+  background: black;
+  margin: 0 auto;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
 }
 </style>
 </head>
+
 <body>
 
-<h2>Soyağacı</h2>
+<h2>🌳 Soyağacı</h2>
 
 <div id="tree"></div>
 
-<h3>Not</h3>
-<textarea id="note" rows="5" cols="30"></textarea>
+<h3>Notlar</h3>
+<textarea id="note" rows="4" cols="30"></textarea>
 
 <script>
-const people = ["Ahmet","Ayşe","Mehmet","Fatma","Ali","Zeynep","Hasan","Elif","Burak","Ceren","Ece","Mert","Deniz","Can","Lara","Arda","Kaan","Melek","Emre","Selin","Ozan","Derya","Kerem","Naz","Efe","Seda","Volkan","Aylin","Baran","Defne"];
+const treeData = [
+  {name: "Dede", children: [
+    {name: "Baba", children: [
+      {name: "Ben"},
+      {name: "Kardeş"}
+    ]},
+    {name: "Amca", children: [
+      {name: "Kuzen1"},
+      {name: "Kuzen2"}
+    ]}
+  ]}
+];
 
-const tree = document.getElementById("tree");
+const treeDiv = document.getElementById("tree");
 const note = document.getElementById("note");
 
 let current = "";
 
-people.forEach(name => {
+function createNode(person) {
   const div = document.createElement("div");
   div.className = "node";
-  div.innerText = name;
+  div.innerText = person.name;
 
   div.onclick = () => {
-    current = name;
-    note.value = localStorage.getItem(name) || "";
+    current = person.name;
+    note.value = localStorage.getItem(current) || "";
   };
 
-  tree.appendChild(div);
-});
+  let container = document.createElement("div");
+
+  if (person.children) {
+    let childRow = document.createElement("div");
+    childRow.className = "row";
+
+    person.children.forEach(child => {
+      childRow.appendChild(createNode(child));
+    });
+
+    container.appendChild(div);
+
+    let line = document.createElement("div");
+    line.className = "line";
+
+    container.appendChild(line);
+    container.appendChild(childRow);
+  } else {
+    container.appendChild(div);
+  }
+
+  return container;
+}
+
+treeDiv.appendChild(createNode(treeData[0]));
 
 note.oninput = () => {
   if(current) {
