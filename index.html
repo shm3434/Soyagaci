@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Soyağacı</title>
+<style>
+body {
+  font-family: Arial;
+  text-align: center;
+}
+.node {
+  display: inline-block;
+  padding: 10px;
+  margin: 10px;
+  border: 1px solid black;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<h2>Soyağacı</h2>
+
+<div id="tree"></div>
+
+<h3>Not</h3>
+<textarea id="note" rows="5" cols="30"></textarea>
+
+<script>
+const people = ["Ahmet","Ayşe","Mehmet","Fatma","Ali","Zeynep","Hasan","Elif","Burak","Ceren","Ece","Mert","Deniz","Can","Lara","Arda","Kaan","Melek","Emre","Selin","Ozan","Derya","Kerem","Naz","Efe","Seda","Volkan","Aylin","Baran","Defne"];
+
+const tree = document.getElementById("tree");
+const note = document.getElementById("note");
+
+let current = "";
+
+people.forEach(name => {
+  const div = document.createElement("div");
+  div.className = "node";
+  div.innerText = name;
+
+  div.onclick = () => {
+    current = name;
+    note.value = localStorage.getItem(name) || "";
+  };
+
+  tree.appendChild(div);
+});
+
+note.oninput = () => {
+  if(current) {
+    localStorage.setItem(current, note.value);
+  }
+};
+</script>
+
+</body>
+</html>
