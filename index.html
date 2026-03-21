@@ -72,17 +72,18 @@ button {
 <div class="modal" id="modal">
   <div class="modal-content">
     <h3>Kişi</h3>
-    <input id="nameInput" placeholder="İsim">
-    <textarea id="noteInput" placeholder="Not"></textarea>
+    <input id="nameInput">
+    <textarea id="noteInput"></textarea>
     <button onclick="save()">Kaydet</button>
     <button onclick="addChild()">Çocuk Ekle</button>
+    <button onclick="addSpouse()">Eş Ekle</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
 
 <script>
 
-// ===== ID ÜRET =====
+// ===== ID =====
 function createId(){
   return Date.now() + Math.random();
 }
@@ -92,13 +93,12 @@ let data = JSON.parse(localStorage.getItem("treeData")) || {
   id:createId(),
   name:"Ata",
   note:"",
-  children:[
-    { id:createId(), name:"Ahmet", note:"", children:[] },
-    { id:createId(), name:"Mehmet", note:"", children:[] }
-  ]
+  spouse:null,
+  children:[]
 };
 
 let selectedNode = null;
+let selectedType = "self"; // self / spouse
 
 const svg = d3.select("svg");
 const g = svg.append("g");
@@ -107,7 +107,7 @@ svg.call(d3.zoom().on("zoom", (e)=>{
   g.attr("transform", e.transform);
 }));
 
-// ===== KAYDET =====
+// ===== SAVE =====
 function saveTree(){
   localStorage.setItem("treeData", JSON.stringify(data));
 }
@@ -118,21 +118,31 @@ function updateTree(){
   g.selectAll("*").remove();
 
   const root = d3.hierarchy(data);
-  const treeLayout = d3.tree().nodeSize([80,150]);
+  const treeLayout = d3.tree().nodeSize([100,150]);
   treeLayout(root);
 
-  // LINKS
+  // LINKS (ÖZEL - ORTADAN)
   g.selectAll(".link")
     .data(root.links())
     .enter()
     .append("path")
     .attr("class","link")
-    .attr("d", d=>`
-      M${d.source.x},${d.source.y}
-      V${(d.source.y + d.target.y)/2}
-      H${d.target.x}
-      V${d.target.y}
-    `);
+    .attr("d", d=>{
+
+      let sourceX = d.source.x;
+
+      // eş varsa ortadan çıkar
+      if(d.source.data.spouse){
+        sourceX = d.source.x + 30;
+      }
+
+      return `
+        M${sourceX},${d.source.y}
+        V${(d.source.y + d.target.y)/2}
+        H${d.target.x}
+        V${d.target.y}
+      `;
+    });
 
   // NODES
   const nodes = g.selectAll(".node")
@@ -142,44 +152,86 @@ function updateTree(){
     .attr("class","node")
     .attr("transform", d=>`translate(${d.x},${d.y})`);
 
+  // ANA KİŞİ
   nodes.append("rect")
     .attr("x",-30)
     .attr("y",-15)
     .attr("width",60)
-    .attr("height",30);
+    .attr("height",30)
+    .on("click",(e,d)=>{
+      selectedNode = d.data;
+      selectedType = "self";
+      openModal(d.data);
+      e.stopPropagation();
+    });
 
   nodes.append("text")
     .attr("dy",4)
     .text(d=>d.data.name);
 
-  nodes.on("click",(e,d)=>{
-    selectedNode = d.data;
+  // EŞ
+  nodes.each(function(d){
 
-    document.getElementById("nameInput").value = d.data.name;
-    document.getElementById("noteInput").value = d.data.note || "";
+    if(d.data.spouse){
 
-    document.getElementById("modal").style.display="flex";
+      const gNode = d3.select(this);
+
+      gNode.append("rect")
+        .attr("x",30)
+        .attr("y",-15)
+        .attr("width",60)
+        .attr("height",30)
+        .attr("fill","#ffe6e6")
+        .on("click",(e)=>{
+          selectedNode = d.data;
+          selectedType = "spouse";
+          openModal(d.data.spouse);
+          e.stopPropagation();
+        });
+
+      gNode.append("text")
+        .attr("x",60)
+        .attr("dy",4)
+        .text(d.data.spouse.name);
+    }
+
   });
 
 }
 
 // ===== MODAL =====
+function openModal(person){
+  document.getElementById("nameInput").value = person.name;
+  document.getElementById("noteInput").value = person.note || "";
+  document.getElementById("modal").style.display="flex";
+}
+
 function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 
-// ===== KAYDET =====
+// ===== SAVE =====
 function save(){
-  selectedNode.name = document.getElementById("nameInput").value;
-  selectedNode.note = document.getElementById("noteInput").value;
+
+  const name = document.getElementById("nameInput").value;
+  const note = document.getElementById("noteInput").value;
+
+  if(selectedType === "self"){
+    selectedNode.name = name;
+    selectedNode.note = note;
+  } else {
+    selectedNode.spouse.name = name;
+    selectedNode.spouse.note = note;
+  }
 
   saveTree();
   closeModal();
   updateTree();
 }
 
-// ===== ÇOCUK =====
+// ===== CHILD =====
 function addChild(){
+
   if(!selectedNode.children){
     selectedNode.children = [];
   }
@@ -188,6 +240,7 @@ function addChild(){
     id:createId(),
     name:"Yeni Kişi",
     note:"",
+    spouse:null,
     children:[]
   });
 
@@ -195,7 +248,25 @@ function addChild(){
   updateTree();
 }
 
-// ===== BAŞLAT =====
+// ===== SPOUSE =====
+function addSpouse(){
+
+  if(selectedNode.spouse){
+    alert("Zaten eşi var");
+    return;
+  }
+
+  selectedNode.spouse = {
+    id:createId(),
+    name:"Eş",
+    note:""
+  };
+
+  saveTree();
+  updateTree();
+}
+
+// ===== START =====
 updateTree();
 
 </script>
