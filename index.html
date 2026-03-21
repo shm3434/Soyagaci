@@ -16,17 +16,31 @@ body {
 }
 
 .person {
-  display: inline-block;
   padding: 10px 15px;
-  margin: 10px;
   border: 2px solid black;
   border-radius: 10px;
   cursor: pointer;
   background: white;
+  min-width: 60px;
+  text-align: center;
 }
 
 .selected {
   background: yellow;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.children {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 10px;
 }
 
 .controls {
@@ -48,14 +62,32 @@ body {
   <button onclick="addParent()">Ebeveyn Ekle</button>
   <button onclick="addSpouse()">Eş Ekle</button>
   <button onclick="updateName()">İsmi Güncelle</button>
+  <button onclick="resetTree()">Sıfırla</button>
 </div>
 
 <script>
-// ====== STATE ======
+// ===== STATE =====
 let tree = [];
 let selectedPersonId = null;
 
-// ====== KİŞİ OLUŞTUR ======
+// ===== KAYDET =====
+function saveTree() {
+  localStorage.setItem("familyTree", JSON.stringify(tree));
+}
+
+// ===== YÜKLE =====
+function loadTree() {
+  const data = localStorage.getItem("familyTree");
+
+  if (data) {
+    tree = JSON.parse(data);
+  } else {
+    const root = createPerson("Ata");
+    tree.push(root);
+  }
+}
+
+// ===== KİŞİ =====
 function createPerson(name) {
   return {
     id: Date.now() + Math.random(),
@@ -66,18 +98,17 @@ function createPerson(name) {
   };
 }
 
-// ====== BUL ======
 function findPerson(id) {
   return tree.find(p => p.id === id);
 }
 
-// ====== SEÇ ======
+// ===== SEÇ =====
 function selectPerson(id) {
   selectedPersonId = id;
   renderTree();
 }
 
-// ====== ÇOCUK EKLE ======
+// ===== ÇOCUK =====
 function addChild() {
   const name = document.getElementById("nameInput").value;
   if (!selectedPersonId || !name) return;
@@ -98,7 +129,7 @@ function addChild() {
   renderTree();
 }
 
-// ====== EBEVEYN EKLE ======
+// ===== EBEVEYN =====
 function addParent() {
   const name = document.getElementById("nameInput").value;
   if (!selectedPersonId || !name) return;
@@ -113,7 +144,7 @@ function addParent() {
   renderTree();
 }
 
-// ====== EŞ EKLE ======
+// ===== EŞ =====
 function addSpouse() {
   const name = document.getElementById("nameInput").value;
   if (!selectedPersonId || !name) return;
@@ -130,7 +161,7 @@ function addSpouse() {
   renderTree();
 }
 
-// ====== İSİM GÜNCELLE ======
+// ===== İSİM =====
 function updateName() {
   const name = document.getElementById("nameInput").value;
   if (!selectedPersonId || !name) return;
@@ -141,35 +172,45 @@ function updateName() {
   renderTree();
 }
 
-// ====== AĞACI ÇİZ ======
+// ===== SIFIRLA =====
+function resetTree() {
+  localStorage.removeItem("familyTree");
+  location.reload();
+}
+
+// ===== ÇİZ =====
 function renderTree() {
   const container = document.getElementById("tree");
   container.innerHTML = "";
 
-  // sadece en üst ataları bul
   const roots = tree.filter(p => p.parents.length === 0);
 
   roots.forEach(root => {
     container.appendChild(drawPerson(root));
   });
+
+  saveTree(); // 🔥 otomatik kayıt
 }
 
-// ====== RECURSIVE ÇİZİM ======
+// ===== ÇİZİM =====
 function drawPerson(person) {
-  const div = document.createElement("div");
+  const wrapper = document.createElement("div");
 
-  div.className = "person";
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const personDiv = document.createElement("div");
+  personDiv.className = "person";
+
   if (person.id === selectedPersonId) {
-    div.classList.add("selected");
+    personDiv.classList.add("selected");
   }
 
-  div.innerText = person.name;
-  div.onclick = () => selectPerson(person.id);
+  personDiv.innerText = person.name;
+  personDiv.onclick = () => selectPerson(person.id);
 
-  const wrapper = document.createElement("div");
-  wrapper.appendChild(div);
+  row.appendChild(personDiv);
 
-  // eş göster
   if (person.spouse) {
     const spouse = findPerson(person.spouse);
     if (spouse) {
@@ -177,13 +218,16 @@ function drawPerson(person) {
       spouseDiv.className = "person";
       spouseDiv.innerText = "❤️ " + spouse.name;
       spouseDiv.onclick = () => selectPerson(spouse.id);
-      wrapper.appendChild(spouseDiv);
+
+      row.appendChild(spouseDiv);
     }
   }
 
-  // çocuklar
+  wrapper.appendChild(row);
+
   if (person.children.length > 0) {
     const childrenDiv = document.createElement("div");
+    childrenDiv.className = "children";
 
     person.children.forEach(childId => {
       const child = findPerson(childId);
@@ -196,9 +240,8 @@ function drawPerson(person) {
   return wrapper;
 }
 
-// ====== BAŞLANGIÇ ======
-const root = createPerson("Ata");
-tree.push(root);
+// ===== BAŞLAT =====
+loadTree();
 renderTree();
 
 </script>
