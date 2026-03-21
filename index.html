@@ -83,12 +83,10 @@ button {
 
 <script>
 
-// ===== ID =====
 function createId(){
   return Date.now() + Math.random();
 }
 
-// ===== DATA =====
 let data = JSON.parse(localStorage.getItem("treeData")) || {
   id:createId(),
   name:"Ata",
@@ -111,21 +109,39 @@ function saveTree(){
   localStorage.setItem("treeData", JSON.stringify(data));
 }
 
-// ===== TEXT WIDTH HESAPLA =====
+// TEXT GENİŞLİĞİ
 function getTextWidth(text){
-  return text.length * 7 + 20; // dinamik genişlik
+  return text.length * 7 + 20;
 }
 
-// ===== TREE =====
 function updateTree(){
 
   g.selectAll("*").remove();
 
   const root = d3.hierarchy(data);
-  const treeLayout = d3.tree().nodeSize([120,180]);
+
+  // DAHA GENİŞ ARALIK
+  const treeLayout = d3.tree().nodeSize([150,200]);
   treeLayout(root);
 
-  // LINKS (ORTA)
+  // NODE BİLGİLERİ HESAPLA
+  root.descendants().forEach(d=>{
+    const gap = 10;
+
+    const mainWidth = getTextWidth(d.data.name);
+    const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
+
+    const totalWidth = mainWidth + (d.data.spouse ? gap + spouseWidth : 0);
+
+    d.mainWidth = mainWidth;
+    d.spouseWidth = spouseWidth;
+    d.totalWidth = totalWidth;
+
+    // MERKEZ
+    d.centerX = d.x + (d.data.spouse ? (spouseWidth + gap)/2 : 0);
+  });
+
+  // LINKS (ORTADAN)
   g.selectAll(".link")
     .data(root.links())
     .enter()
@@ -133,11 +149,7 @@ function updateTree(){
     .attr("class","link")
     .attr("d", d=>{
 
-      let sourceX = d.source.x;
-
-      if(d.source.data.spouse){
-        sourceX = d.source.x + 40;
-      }
+      let sourceX = d.source.centerX;
 
       return `
         M${sourceX},${d.source.y}
@@ -147,7 +159,7 @@ function updateTree(){
       `;
     });
 
-  // NODE
+  // NODES
   const nodes = g.selectAll(".node")
     .data(root.descendants())
     .enter()
@@ -158,14 +170,13 @@ function updateTree(){
   nodes.each(function(d){
 
     const gNode = d3.select(this);
-
-    const mainWidth = getTextWidth(d.data.name);
+    const gap = 10;
 
     // ANA KİŞİ
     gNode.append("rect")
-      .attr("x",-mainWidth/2)
+      .attr("x",-d.mainWidth/2)
       .attr("y",-15)
-      .attr("width",mainWidth)
+      .attr("width",d.mainWidth)
       .attr("height",30)
       .on("click",(e)=>{
         selectedNode = d.data;
@@ -181,14 +192,12 @@ function updateTree(){
     // EŞ
     if(d.data.spouse){
 
-      const spouseWidth = getTextWidth(d.data.spouse.name);
-      const gap = 10;
+      const startX = d.mainWidth/2 + gap;
 
-      // eş kutu
       gNode.append("rect")
-        .attr("x",mainWidth/2 + gap)
+        .attr("x",startX)
         .attr("y",-15)
-        .attr("width",spouseWidth)
+        .attr("width",d.spouseWidth)
         .attr("height",30)
         .attr("fill","#ffe6e6")
         .on("click",(e)=>{
@@ -198,16 +207,15 @@ function updateTree(){
           e.stopPropagation();
         });
 
-      // eş text
       gNode.append("text")
-        .attr("x",mainWidth/2 + gap + spouseWidth/2)
+        .attr("x",startX + d.spouseWidth/2)
         .attr("dy",4)
         .text(d.data.spouse.name);
 
-      // ❤️ EŞLER ARASI ÇİZGİ
+      // EŞ ÇİZGİSİ (DÜZELTİLDİ)
       gNode.append("line")
-        .attr("x1", mainWidth/2)
-        .attr("x2", mainWidth/2 + gap)
+        .attr("x1", d.mainWidth/2)
+        .attr("x2", startX + d.spouseWidth/2)
         .attr("y1",0)
         .attr("y2",0)
         .attr("stroke","black")
@@ -218,7 +226,7 @@ function updateTree(){
 
 }
 
-// ===== MODAL =====
+// MODAL
 function openModal(person){
   document.getElementById("nameInput").value = person.name;
   document.getElementById("noteInput").value = person.note || "";
@@ -229,7 +237,7 @@ function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 
-// ===== SAVE =====
+// SAVE
 function save(){
 
   const name = document.getElementById("nameInput").value;
@@ -248,7 +256,7 @@ function save(){
   updateTree();
 }
 
-// ===== CHILD =====
+// CHILD
 function addChild(){
 
   if(!selectedNode.children){
@@ -267,7 +275,7 @@ function addChild(){
   updateTree();
 }
 
-// ===== SPOUSE =====
+// SPOUSE
 function addSpouse(){
 
   if(selectedNode.spouse){
@@ -285,7 +293,7 @@ function addSpouse(){
   updateTree();
 }
 
-// ===== START =====
+// START
 updateTree();
 
 </script>
