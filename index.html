@@ -2,20 +2,14 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı PRO+</title>
-
+<title>Soyağacı PRO++</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 
 <style>
-body { margin:0; font-family: Arial; }
+body { margin:0; font-family:Arial; }
 
-svg {
-  width:100vw;
-  height:85vh;
-  background:#f5f5f5;
-}
+svg { width:100vw; height:85vh; background:#f5f5f5; }
 
-/* NODE */
 .node rect {
   fill:white;
   stroke:black;
@@ -23,63 +17,39 @@ svg {
   rx:6;
 }
 
-.node text {
-  font-size:12px;
-  text-anchor:middle;
-}
+.link { stroke:black; fill:none; }
 
-/* LINK */
-.link {
-  fill:none;
-  stroke:black;
-  stroke-width:2px;
-}
-
-/* MODAL */
 .modal {
   position:fixed;
   top:0; left:0;
-  width:100%;
-  height:100%;
+  width:100%; height:100%;
   background:rgba(0,0,0,0.5);
   display:none;
   justify-content:center;
   align-items:center;
 }
 
-.modal-content {
+.modal-box {
   background:white;
   padding:20px;
-  border-radius:10px;
   width:300px;
 }
 
-input, textarea {
-  width:100%;
-  margin-top:10px;
-}
-
-button {
-  margin-top:10px;
-  width:100%;
-}
+button { margin-top:5px; width:100%; }
 </style>
 </head>
 
 <body>
 
-<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
-
 <svg></svg>
 
-<!-- POPUP -->
 <div class="modal" id="modal">
-  <div class="modal-content">
-    <h3>Kişi</h3>
+  <div class="modal-box">
     <input id="nameInput" placeholder="İsim">
-    <textarea id="noteInput" placeholder="Not"></textarea>
     <button onclick="save()">Kaydet</button>
-    <button onclick="addChild()">Çocuk Ekle</button>
+    <button onclick="addChild()">Çocuk ekle</button>
+    <button onclick="addSpouse()">Eş ekle</button>
+    <button onclick="addParent()">Ebeveyn ekle</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
@@ -88,49 +58,59 @@ button {
 
 let data = {
   name:"Ata",
-  children:[
-    { name:"Ahmet", children:[{name:"Ali"},{name:"Ayşe"}]},
-    { name:"Mehmet", children:[{name:"Hasan"},{name:"Zeynep"}]}
-  ]
+  children:[],
+  spouses:[]
 };
 
-let selectedNode = null;
+let selectedNode=null;
 
 const svg = d3.select("svg");
 const g = svg.append("g");
 
-svg.call(d3.zoom().on("zoom", (e)=>{
-  g.attr("transform", e.transform);
+svg.call(d3.zoom().on("zoom",(e)=>{
+  g.attr("transform",e.transform);
 }));
 
-function updateTree(){
+function normalize(node){
+  if(node.children && node.children.length===1){
+    node.children.push({name:"", ghost:true});
+  }
+  if(node.children){
+    node.children.forEach(normalize);
+  }
+}
+
+function update(){
 
   g.selectAll("*").remove();
 
-  const root = d3.hierarchy(data);
-  const treeLayout = d3.tree().nodeSize([80,150]);
-  treeLayout(root);
+  const clone = JSON.parse(JSON.stringify(data));
+  normalize(clone);
 
-  // LINKS
+  const root = d3.hierarchy(clone);
+  const tree = d3.tree().nodeSize([100,150]);
+  tree(root);
+
+  // LINK
   g.selectAll(".link")
     .data(root.links())
     .enter()
     .append("path")
     .attr("class","link")
-    .attr("d", d=>`
+    .attr("d",d=>`
       M${d.source.x},${d.source.y}
-      V${(d.source.y + d.target.y)/2}
+      V${(d.source.y+d.target.y)/2}
       H${d.target.x}
       V${d.target.y}
     `);
 
-  // NODES
+  // NODE
   const nodes = g.selectAll(".node")
-    .data(root.descendants())
+    .data(root.descendants().filter(d=>!d.data.ghost))
     .enter()
     .append("g")
     .attr("class","node")
-    .attr("transform", d=>`translate(${d.x},${d.y})`);
+    .attr("transform",d=>`translate(${d.x},${d.y})`);
 
   nodes.append("rect")
     .attr("x",-30)
@@ -143,47 +123,53 @@ function updateTree(){
     .text(d=>d.data.name);
 
   nodes.on("click",(e,d)=>{
-    selectedNode = d.data;
+    selectedNode = findNode(data,d.data.name);
 
-    document.getElementById("nameInput").value = d.data.name;
-    document.getElementById("noteInput").value =
-      localStorage.getItem(d.data.name) || "";
+    document.getElementById("nameInput").value = selectedNode.name;
 
     document.getElementById("modal").style.display="flex";
   });
 
 }
 
+function findNode(node,name){
+  if(node.name===name) return node;
+  if(node.children){
+    for(let c of node.children){
+      let found = findNode(c,name);
+      if(found) return found;
+    }
+  }
+  return null;
+}
+
+function save(){
+  selectedNode.name = document.getElementById("nameInput").value;
+  closeModal();
+  update();
+}
+
+function addChild(){
+  if(!selectedNode.children) selectedNode.children=[];
+  selectedNode.children.push({name:"Yeni"});
+  update();
+}
+
+function addSpouse(){
+  if(!selectedNode.spouses) selectedNode.spouses=[];
+  selectedNode.spouses.push({name:"Eş"});
+  alert("Eş eklendi (yakında çizime yansıtılacak)");
+}
+
+function addParent(){
+  alert("Ebeveyn sistemi bir sonraki adımda görselleştirilecek");
+}
+
 function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 
-function save(){
-  const newName = document.getElementById("nameInput").value;
-
-  localStorage.setItem(newName,
-    document.getElementById("noteInput").value
-  );
-
-  selectedNode.name = newName;
-
-  closeModal();
-  updateTree();
-}
-
-function addChild(){
-  if(!selectedNode.children){
-    selectedNode.children = [];
-  }
-
-  selectedNode.children.push({
-    name:"Yeni Kişi"
-  });
-
-  updateTree();
-}
-
-updateTree();
+update();
 
 </script>
 
