@@ -2,12 +2,12 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı Eşli</title>
+<title>Soyağacı PRO+</title>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 
 <style>
-body { margin:0; font-family:Arial; }
+body { margin:0; font-family: Arial; }
 
 svg {
   width:100vw;
@@ -22,12 +22,13 @@ svg {
   rx:6;
 }
 
-.link {
-  stroke:black;
-  fill:none;
+.node text {
+  font-size:12px;
+  text-anchor:middle;
 }
 
-.spouse-line {
+.link {
+  fill:none;
   stroke:black;
   stroke-width:2px;
 }
@@ -35,98 +36,113 @@ svg {
 .modal {
   position:fixed;
   top:0; left:0;
-  width:100%; height:100%;
+  width:100%;
+  height:100%;
   background:rgba(0,0,0,0.5);
   display:none;
   justify-content:center;
   align-items:center;
 }
 
-.box {
+.modal-content {
   background:white;
   padding:20px;
+  border-radius:10px;
   width:300px;
 }
 
-button { margin-top:10px; width:100%; }
+input, textarea {
+  width:100%;
+  margin-top:10px;
+}
+
+button {
+  margin-top:10px;
+  width:100%;
+}
 </style>
 </head>
 
 <body>
 
+<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
+
 <svg></svg>
 
 <div class="modal" id="modal">
-  <div class="box">
-    <input id="nameInput">
+  <div class="modal-content">
+    <h3>Kişi</h3>
+    <input id="nameInput" placeholder="İsim">
+    <textarea id="noteInput" placeholder="Not"></textarea>
     <button onclick="save()">Kaydet</button>
-    <button onclick="addChild()">Çocuk ekle</button>
-    <button onclick="addSpouse()">Eş ekle</button>
+    <button onclick="addChild()">Çocuk Ekle</button>
+    <button onclick="addSpouse()">Eş Ekle</button>
+    <button onclick="addParent()">Ebeveyn Ekle</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
 
 <script>
 
-// YENİ MODEL
 let data = {
-  name:"Baba",
-  spouse:{ name:"Anne" },
+  name:"Ata",
   children:[
-    { name:"Çocuk1" },
-    { name:"Çocuk2" }
+    { name:"Ahmet", children:[{name:"Ali"},{name:"Ayşe"}]},
+    { name:"Mehmet", children:[{name:"Hasan"},{name:"Zeynep"}]}
   ]
 };
 
-let selected = null;
+let selectedNode = null;
 
 const svg = d3.select("svg");
 const g = svg.append("g");
 
-svg.call(d3.zoom().on("zoom",(e)=>{
-  g.attr("transform",e.transform);
+svg.call(d3.zoom().on("zoom", (e)=>{
+  g.attr("transform", e.transform);
 }));
 
-function buildTree(node){
-  let children = node.children || [];
-  return {
-    name: node.name,
-    ref: node,
-    children: children.map(buildTree)
-  };
+// 🔥 TEK ÇOCUK DÜZELTME
+function normalize(node){
+  if(node.children && node.children.length === 1){
+    node.children.push({name:"", ghost:true});
+  }
+  if(node.children){
+    node.children.forEach(normalize);
+  }
 }
 
-function update(){
+function updateTree(){
 
   g.selectAll("*").remove();
 
-  const rootData = buildTree(data);
-  const root = d3.hierarchy(rootData);
+  const clone = JSON.parse(JSON.stringify(data));
+  normalize(clone);
 
-  const tree = d3.tree().nodeSize([120,150]);
-  tree(root);
+  const root = d3.hierarchy(clone);
+  const treeLayout = d3.tree().nodeSize([80,150]);
+  treeLayout(root);
 
-  // ÇİZGİLER
+  // LINKS
   g.selectAll(".link")
     .data(root.links())
     .enter()
     .append("path")
     .attr("class","link")
-    .attr("d",d=>`
+    .attr("d", d=>`
       M${d.source.x},${d.source.y}
-      V${(d.source.y+d.target.y)/2}
+      V${(d.source.y + d.target.y)/2}
       H${d.target.x}
       V${d.target.y}
     `);
 
-  // NODE
+  // NODES
   const nodes = g.selectAll(".node")
-    .data(root.descendants())
+    .data(root.descendants().filter(d=>!d.data.ghost))
     .enter()
     .append("g")
-    .attr("transform",d=>`translate(${d.x},${d.y})`);
+    .attr("class","node")
+    .attr("transform", d=>`translate(${d.x},${d.y})`);
 
-  // ANA KİŞİ
   nodes.append("rect")
     .attr("x",-30)
     .attr("y",-15)
@@ -137,45 +153,39 @@ function update(){
     .attr("dy",4)
     .text(d=>d.data.name);
 
-  // EŞ ÇİZ
+  // 🔥 EŞ ÇİZİMİ
   nodes.each(function(d){
-
-    const node = d.data.ref;
-
-    if(node.spouse){
-
-      const spouseX = 80;
-
-      // eş kutu
+    if(d.data.spouse){
       d3.select(this)
         .append("rect")
-        .attr("x",spouseX-30)
+        .attr("x",40)
         .attr("y",-15)
         .attr("width",60)
         .attr("height",30);
 
       d3.select(this)
         .append("text")
-        .attr("x",spouseX)
+        .attr("x",70)
         .attr("dy",4)
-        .text(node.spouse.name);
+        .text(d.data.spouse.name);
 
-      // eş çizgi
       d3.select(this)
         .append("line")
-        .attr("class","spouse-line")
         .attr("x1",30)
-        .attr("x2",spouseX-30)
+        .attr("x2",40)
         .attr("y1",0)
-        .attr("y2",0);
+        .attr("y2",0)
+        .attr("stroke","black");
     }
-
   });
 
-  // TIKLAMA
   nodes.on("click",(e,d)=>{
-    selected = d.data.ref;
-    document.getElementById("nameInput").value = selected.name;
+    selectedNode = d.data;
+
+    document.getElementById("nameInput").value = d.data.name;
+    document.getElementById("noteInput").value =
+      localStorage.getItem(d.data.name) || "";
+
     document.getElementById("modal").style.display="flex";
   });
 
@@ -186,25 +196,43 @@ function closeModal(){
 }
 
 function save(){
-  selected.name = document.getElementById("nameInput").value;
+  const newName = document.getElementById("nameInput").value;
+
+  localStorage.setItem(newName,
+    document.getElementById("noteInput").value
+  );
+
+  selectedNode.name = newName;
+
   closeModal();
-  update();
+  updateTree();
 }
 
+// ✅ ÇOCUK
 function addChild(){
-  if(!selected.children) selected.children=[];
-  selected.children.push({name:"Yeni"});
-  closeModal();
-  update();
+  if(!selectedNode.children){
+    selectedNode.children = [];
+  }
+  selectedNode.children.push({ name:"Yeni Kişi" });
+  updateTree();
 }
 
+// ✅ EŞ
 function addSpouse(){
-  selected.spouse = {name:"Eş"};
-  closeModal();
-  update();
+  selectedNode.spouse = { name:"Eş" };
+  updateTree();
 }
 
-update();
+// ✅ EBEVEYN
+function addParent(){
+  data = {
+    name:"Yeni Üst",
+    children:[data]
+  };
+  updateTree();
+}
+
+updateTree();
 
 </script>
 
