@@ -2,29 +2,36 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı PRO</title>
+<title>Soyağacı Eşli</title>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
 
 <style>
 body { margin:0; font-family:Arial; }
 
-#tree {
+svg {
   width:100vw;
   height:85vh;
-  overflow:auto;
-  position:relative;
   background:#f5f5f5;
 }
 
-.node {
-  position:absolute;
-  border:2px solid black;
-  padding:6px 10px;
-  border-radius:6px;
-  background:white;
-  cursor:pointer;
+.node rect {
+  fill:white;
+  stroke:black;
+  stroke-width:2px;
+  rx:6;
 }
 
-/* POPUP */
+.link {
+  stroke:black;
+  fill:none;
+}
+
+.spouse-line {
+  stroke:black;
+  stroke-width:2px;
+}
+
 .modal {
   position:fixed;
   top:0; left:0;
@@ -47,57 +54,131 @@ button { margin-top:10px; width:100%; }
 
 <body>
 
-<div id="tree"></div>
+<svg></svg>
 
 <div class="modal" id="modal">
   <div class="box">
     <input id="nameInput">
     <button onclick="save()">Kaydet</button>
     <button onclick="addChild()">Çocuk ekle</button>
+    <button onclick="addSpouse()">Eş ekle</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
 
 <script>
 
+// YENİ MODEL
 let data = {
-  name:"Ata",
+  name:"Baba",
+  spouse:{ name:"Anne" },
   children:[
-    {name:"Ahmet", children:[{name:"Ali"},{name:"Ayşe"}]},
-    {name:"Mehmet", children:[{name:"Hasan"},{name:"Zeynep"}]},
-    {name:"Fatma", children:[{name:"Elif"},{name:"Ece"}]}
+    { name:"Çocuk1" },
+    { name:"Çocuk2" }
   ]
 };
 
-let selected=null;
+let selected = null;
 
-function draw(node,x,y,level=0){
-  const div=document.createElement("div");
-  div.className="node";
-  div.innerText=node.name;
-  div.style.left=x+"px";
-  div.style.top=y+"px";
+const svg = d3.select("svg");
+const g = svg.append("g");
 
-  div.onclick=()=>{
-    selected=node;
-    document.getElementById("nameInput").value=node.name;
-    document.getElementById("modal").style.display="flex";
+svg.call(d3.zoom().on("zoom",(e)=>{
+  g.attr("transform",e.transform);
+}));
+
+function buildTree(node){
+  let children = node.children || [];
+  return {
+    name: node.name,
+    ref: node,
+    children: children.map(buildTree)
   };
-
-  document.getElementById("tree").appendChild(div);
-
-  if(node.children){
-    let startX=x-((node.children.length-1)*100)/2;
-
-    node.children.forEach((c,i)=>{
-      draw(c,startX+i*100,y+100,level+1);
-    });
-  }
 }
 
-function render(){
-  document.getElementById("tree").innerHTML="";
-  draw(data,window.innerWidth/2,50);
+function update(){
+
+  g.selectAll("*").remove();
+
+  const rootData = buildTree(data);
+  const root = d3.hierarchy(rootData);
+
+  const tree = d3.tree().nodeSize([120,150]);
+  tree(root);
+
+  // ÇİZGİLER
+  g.selectAll(".link")
+    .data(root.links())
+    .enter()
+    .append("path")
+    .attr("class","link")
+    .attr("d",d=>`
+      M${d.source.x},${d.source.y}
+      V${(d.source.y+d.target.y)/2}
+      H${d.target.x}
+      V${d.target.y}
+    `);
+
+  // NODE
+  const nodes = g.selectAll(".node")
+    .data(root.descendants())
+    .enter()
+    .append("g")
+    .attr("transform",d=>`translate(${d.x},${d.y})`);
+
+  // ANA KİŞİ
+  nodes.append("rect")
+    .attr("x",-30)
+    .attr("y",-15)
+    .attr("width",60)
+    .attr("height",30);
+
+  nodes.append("text")
+    .attr("dy",4)
+    .text(d=>d.data.name);
+
+  // EŞ ÇİZ
+  nodes.each(function(d){
+
+    const node = d.data.ref;
+
+    if(node.spouse){
+
+      const spouseX = 80;
+
+      // eş kutu
+      d3.select(this)
+        .append("rect")
+        .attr("x",spouseX-30)
+        .attr("y",-15)
+        .attr("width",60)
+        .attr("height",30);
+
+      d3.select(this)
+        .append("text")
+        .attr("x",spouseX)
+        .attr("dy",4)
+        .text(node.spouse.name);
+
+      // eş çizgi
+      d3.select(this)
+        .append("line")
+        .attr("class","spouse-line")
+        .attr("x1",30)
+        .attr("x2",spouseX-30)
+        .attr("y1",0)
+        .attr("y2",0);
+    }
+
+  });
+
+  // TIKLAMA
+  nodes.on("click",(e,d)=>{
+    selected = d.data.ref;
+    document.getElementById("nameInput").value = selected.name;
+    document.getElementById("modal").style.display="flex";
+  });
+
 }
 
 function closeModal(){
@@ -105,19 +186,25 @@ function closeModal(){
 }
 
 function save(){
-  selected.name=document.getElementById("nameInput").value;
+  selected.name = document.getElementById("nameInput").value;
   closeModal();
-  render();
+  update();
 }
 
 function addChild(){
   if(!selected.children) selected.children=[];
   selected.children.push({name:"Yeni"});
   closeModal();
-  render();
+  update();
 }
 
-render();
+function addSpouse(){
+  selected.spouse = {name:"Eş"};
+  closeModal();
+  update();
+}
+
+update();
 
 </script>
 
