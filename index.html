@@ -1,115 +1,25 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8">
-<title>Soyağacı</title>
-<style>
-body {
-  font-family: Arial;
-  text-align: center;
-}
-
-/* AĞAÇ */
-.tree {
-  display: flex;
-  justify-content: center;
-  margin-top: 50px;
-}
-
-.node {
-  border: 2px solid black;
-  padding: 10px;
-  margin: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  background: #fff;
-}
-
-/* BAĞLANTI ÇİZGİLERİ */
-.line {
-  width: 2px;
-  height: 30px;
-  background: black;
-  margin: 0 auto;
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-</style>
-</head>
-
-<body>
-
-<h2>🌳 Soyağacı</h2>
-
-<div id="tree"></div>
-
-<h3>Notlar</h3>
-<textarea id="note" rows="4" cols="30"></textarea>
-
-<script>
 const treeData = [
-  {name: "Dede", children: [
-    {name: "Baba", children: [
-      {name: "Ben"},
-      {name: "Kardeş"}
-    ]},
-    {name: "Amca", children: [
-      {name: "Kuzen1"},
-      {name: "Kuzen2"}
-    ]}
-  ]}
-];
-
-const treeDiv = document.getElementById("tree");
-const note = document.getElementById("note");
-
-let current = "";
-
-function createNode(person) {
-  const div = document.createElement("div");
-  div.className = "node";
-  div.innerText = person.name;
-
-  div.onclick = () => {
-    current = person.name;
-    note.value = localStorage.getItem(current) || "";
-  };
-
-  let container = document.createElement("div");
-
-  if (person.children) {
-    let childRow = document.createElement("div");
-    childRow.className = "row";
-
-    person.children.forEach(child => {
-      childRow.appendChild(createNode(child));
-    });
-
-    container.appendChild(div);
-
-    let line = document.createElement("div");
-    line.className = "line";
-
-    container.appendChild(line);
-    container.appendChild(childRow);
-  } else {
-    container.appendChild(div);
-  }
-
-  return container;
-}
-
-treeDiv.appendChild(createNode(treeData[0]));
-
-note.oninput = () => {
-  if(current) {
-    localStorage.setItem(current, note.value);
-  }
-};
-</script>
-
-</body>
-</html>
+  {
+    name: "Ata",
+    children: [
+      {
+        name: "Ahmet",
+        children: [
+          { name: "Ali", children: [{name:"Ali Çocuk1"}, {name:"Ali Çocuk2"}] },
+          { name: "Ayşe", children: [{name:"Ayşe Çocuk1"}, {name:"Ayşe Çocuk2"}] },
+          { name: "Mehmet", children: [{name:"Mehmet Çocuk1"}] }
+        ]
+      },
+      {
+        name: "Mehmet",
+        children: [
+          { name: "Hasan", children: [{name:"Hasan Çocuk1"}, {name:"Hasan Çocuk2"}] },
+          { name: "Hüseyin", children: [{name:"Hüseyin Çocuk1"}] },
+          { name: "Zeynep", children: [{name:"Zeynep Çocuk1"}, {name:"Zeynep Çocuk2"}] }
+        ]
+      },
+      {
+        name: "Fatma",
+        children: [
+          { name: "Elif", children: [{name:"Elif Çocuk1"}, {name:"Elif Çocuk2"}] },
+          { name: "Ece", children: [{name:"E
