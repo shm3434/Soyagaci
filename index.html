@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı PRO++</title>
+<title>Soyağacı STABLE</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 
 <style>
@@ -35,7 +35,7 @@ svg { width:100vw; height:85vh; background:#f5f5f5; }
   width:300px;
 }
 
-button { margin-top:5px; width:100%; }
+button { margin-top:8px; width:100%; }
 </style>
 </head>
 
@@ -43,23 +43,56 @@ button { margin-top:5px; width:100%; }
 
 <svg></svg>
 
-<div class="modal" id="modal">
+<!-- POPUP 1 -->
+<div class="modal" id="modal1">
   <div class="modal-box">
-    <input id="nameInput" placeholder="İsim">
+    <h3>Kişi</h3>
+    <input id="nameInput">
     <button onclick="save()">Kaydet</button>
-    <button onclick="addChild()">Çocuk ekle</button>
-    <button onclick="addSpouse()">Eş ekle</button>
-    <button onclick="addParent()">Ebeveyn ekle</button>
+    <button onclick="openAddMenu()">Kişi ekle</button>
     <button onclick="closeModal()">Kapat</button>
+  </div>
+</div>
+
+<!-- POPUP 2 -->
+<div class="modal" id="modal2">
+  <div class="modal-box">
+    <h3>Kişi ekle</h3>
+    <button onclick="addChild()">Çocuk ekle</button>
+    <button onclick="disabledFeature()">Eş ekle</button>
+    <button onclick="disabledFeature()">Ebeveyn ekle</button>
+    <button onclick="closeAddMenu()">Geri</button>
   </div>
 </div>
 
 <script>
 
+// STABİL VERİ
 let data = {
   name:"Ata",
-  children:[],
-  spouses:[]
+  children:[
+    {
+      name:"Ahmet",
+      children:[
+        {name:"Ali"},
+        {name:"Ayşe"}
+      ]
+    },
+    {
+      name:"Mehmet",
+      children:[
+        {name:"Hasan"},
+        {name:"Zeynep"}
+      ]
+    },
+    {
+      name:"Fatma",
+      children:[
+        {name:"Elif"},
+        {name:"Ece"}
+      ]
+    }
+  ]
 };
 
 let selectedNode=null;
@@ -71,6 +104,7 @@ svg.call(d3.zoom().on("zoom",(e)=>{
   g.attr("transform",e.transform);
 }));
 
+// TEK ÇOCUK DÜZELTME
 function normalize(node){
   if(node.children && node.children.length===1){
     node.children.push({name:"", ghost:true});
@@ -124,10 +158,8 @@ function update(){
 
   nodes.on("click",(e,d)=>{
     selectedNode = findNode(data,d.data.name);
-
     document.getElementById("nameInput").value = selectedNode.name;
-
-    document.getElementById("modal").style.display="flex";
+    document.getElementById("modal1").style.display="flex";
   });
 
 }
@@ -136,42 +168,22 @@ function findNode(node,name){
   if(node.name===name) return node;
   if(node.children){
     for(let c of node.children){
-      let found = findNode(c,name);
-      if(found) return found;
+      let f = findNode(c,name);
+      if(f) return f;
     }
   }
   return null;
 }
 
-function save(){
-  selectedNode.name = document.getElementById("nameInput").value;
-  closeModal();
-  update();
-}
-
-function addChild(){
-  if(!selectedNode.children) selectedNode.children=[];
-  selectedNode.children.push({name:"Yeni"});
-  update();
-}
-
-function addSpouse(){
-  if(!selectedNode.spouses) selectedNode.spouses=[];
-  selectedNode.spouses.push({name:"Eş"});
-  alert("Eş eklendi (yakında çizime yansıtılacak)");
-}
-
-function addParent(){
-  alert("Ebeveyn sistemi bir sonraki adımda görselleştirilecek");
-}
-
+// POPUP
 function closeModal(){
-  document.getElementById("modal").style.display="none";
+  document.getElementById("modal1").style.display="none";
 }
 
-update();
+function openAddMenu(){
+  document.getElementById("modal1").style.display="none";
+  document.getElementById("modal2").style.display="flex";
+}
 
-</script>
-
-</body>
-</html>
+function closeAddMenu(){
+  document.getElementById("modal2").
