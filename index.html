@@ -2,32 +2,26 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı SAFE</title>
+<title>Soyağacı PRO</title>
 
 <style>
-body {
-  font-family: Arial;
-  margin:0;
-  text-align:center;
-}
+body { margin:0; font-family:Arial; }
 
 #tree {
+  width:100vw;
+  height:85vh;
   overflow:auto;
-  white-space:nowrap;
-  padding:20px;
+  position:relative;
+  background:#f5f5f5;
 }
 
 .node {
-  display:inline-block;
+  position:absolute;
   border:2px solid black;
-  padding:8px 12px;
-  margin:10px;
+  padding:6px 10px;
   border-radius:6px;
+  background:white;
   cursor:pointer;
-}
-
-.children {
-  margin-top:20px;
 }
 
 /* POPUP */
@@ -53,27 +47,14 @@ button { margin-top:10px; width:100%; }
 
 <body>
 
-<h2>🌳 Soyağacı</h2>
-
 <div id="tree"></div>
 
-<!-- POPUP 1 -->
-<div class="modal" id="modal1">
+<div class="modal" id="modal">
   <div class="box">
     <input id="nameInput">
     <button onclick="save()">Kaydet</button>
-    <button onclick="openAdd()">Kişi ekle</button>
-    <button onclick="closeModal()">Kapat</button>
-  </div>
-</div>
-
-<!-- POPUP 2 -->
-<div class="modal" id="modal2">
-  <div class="box">
     <button onclick="addChild()">Çocuk ekle</button>
-    <button onclick="alert('sonra')">Eş ekle</button>
-    <button onclick="alert('sonra')">Ebeveyn ekle</button>
-    <button onclick="back()">Geri</button>
+    <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
 
@@ -90,72 +71,53 @@ let data = {
 
 let selected=null;
 
-function render(node){
+function draw(node,x,y,level=0){
+  const div=document.createElement("div");
+  div.className="node";
+  div.innerText=node.name;
+  div.style.left=x+"px";
+  div.style.top=y+"px";
 
-  const div = document.createElement("div");
-
-  const box = document.createElement("div");
-  box.className="node";
-  box.innerText=node.name;
-
-  box.onclick=()=>{
+  div.onclick=()=>{
     selected=node;
     document.getElementById("nameInput").value=node.name;
-    document.getElementById("modal1").style.display="flex";
+    document.getElementById("modal").style.display="flex";
   };
 
-  div.appendChild(box);
+  document.getElementById("tree").appendChild(div);
 
   if(node.children){
-    const childDiv=document.createElement("div");
-    childDiv.className="children";
+    let startX=x-((node.children.length-1)*100)/2;
 
-    node.children.forEach(c=>{
-      childDiv.appendChild(render(c));
+    node.children.forEach((c,i)=>{
+      draw(c,startX+i*100,y+100,level+1);
     });
-
-    div.appendChild(childDiv);
   }
-
-  return div;
 }
 
-function update(){
-  const tree=document.getElementById("tree");
-  tree.innerHTML="";
-  tree.appendChild(render(data));
+function render(){
+  document.getElementById("tree").innerHTML="";
+  draw(data,window.innerWidth/2,50);
 }
 
-// popup
 function closeModal(){
-  document.getElementById("modal1").style.display="none";
+  document.getElementById("modal").style.display="none";
 }
 
-function openAdd(){
-  document.getElementById("modal1").style.display="none";
-  document.getElementById("modal2").style.display="flex";
-}
-
-function back(){
-  document.getElementById("modal2").style.display="none";
-  document.getElementById("modal1").style.display="flex";
-}
-
-// işlemler
 function save(){
   selected.name=document.getElementById("nameInput").value;
   closeModal();
-  update();
+  render();
 }
 
 function addChild(){
   if(!selected.children) selected.children=[];
   selected.children.push({name:"Yeni"});
-  document.getElementById("modal2").style.display="none";
-  update();
+  closeModal();
+  render();
 }
 
-update();
+render();
 
 </script>
 
