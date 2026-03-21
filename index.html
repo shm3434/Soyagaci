@@ -2,222 +2,204 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı FIXED</title>
-
-<script src="https://d3js.org/d3.v7.min.js"></script>
+<title>Soyağacı PRO</title>
 
 <style>
-body { margin:0; font-family: Arial; }
-
-svg {
-  width:100vw;
-  height:85vh;
-  background:#f5f5f5;
+body {
+  font-family: Arial;
+  text-align: center;
+  background: #f5f5f5;
 }
 
-.node rect {
-  fill:white;
-  stroke:black;
-  stroke-width:2px;
-  rx:6;
+#tree {
+  margin-top: 40px;
 }
 
-.node text {
-  font-size:12px;
-  text-anchor:middle;
+.person {
+  display: inline-block;
+  padding: 10px 15px;
+  margin: 10px;
+  border: 2px solid black;
+  border-radius: 10px;
+  cursor: pointer;
+  background: white;
 }
 
-.link {
-  fill:none;
-  stroke:black;
-  stroke-width:2px;
+.selected {
+  background: yellow;
 }
 
-.modal {
-  position:fixed;
-  top:0; left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.5);
-  display:none;
-  justify-content:center;
-  align-items:center;
-}
-
-.modal-content {
-  background:white;
-  padding:20px;
-  border-radius:10px;
-  width:300px;
-}
-
-input, textarea {
-  width:100%;
-  margin-top:10px;
-}
-
-button {
-  margin-top:10px;
-  width:100%;
+.controls {
+  margin-top: 20px;
 }
 </style>
 </head>
 
 <body>
 
-<h3 style="text-align:center;">🌳 Soyağacı</h3>
+<h2>Soyağacı</h2>
 
-<svg></svg>
+<div id="tree"></div>
 
-<div class="modal" id="modal">
-  <div class="modal-content">
-    <input id="nameInput">
-    <button onclick="save()">Kaydet</button>
-    <button onclick="addChild()">Çocuk Ekle</button>
-    <button onclick="addSpouse()">Eş Ekle</button>
-    <button onclick="closeModal()">Kapat</button>
-  </div>
+<div class="controls">
+  <input id="nameInput" placeholder="İsim gir">
+  <br><br>
+  <button onclick="addChild()">Çocuk Ekle</button>
+  <button onclick="addParent()">Ebeveyn Ekle</button>
+  <button onclick="addSpouse()">Eş Ekle</button>
+  <button onclick="updateName()">İsmi Güncelle</button>
 </div>
 
 <script>
+// ====== STATE ======
+let tree = [];
+let selectedPersonId = null;
 
-let data = {
-  name:"Ata",
-  children:[
-    { name:"Ahmet", children:[{name:"Ali"},{name:"Ayşe"}]},
-    { name:"Mehmet", children:[{name:"Hasan"},{name:"Zeynep"}]}
-  ]
-};
-
-let selectedNode = null;
-
-const svg = d3.select("svg");
-const g = svg.append("g");
-
-svg.call(d3.zoom().on("zoom", (e)=>{
-  g.attr("transform", e.transform);
-}));
-
-// 🔥 TEK ÇOCUK FIX
-function normalize(node){
-  if(node.children && node.children.length === 1){
-    node.children.push({name:"", ghost:true});
-  }
-  if(node.children){
-    node.children.forEach(normalize);
-  }
+// ====== KİŞİ OLUŞTUR ======
+function createPerson(name) {
+  return {
+    id: Date.now() + Math.random(),
+    name,
+    children: [],
+    parents: [],
+    spouse: null
+  };
 }
 
-function updateTree(){
+// ====== BUL ======
+function findPerson(id) {
+  return tree.find(p => p.id === id);
+}
 
-  g.selectAll("*").remove();
+// ====== SEÇ ======
+function selectPerson(id) {
+  selectedPersonId = id;
+  renderTree();
+}
 
-  const clone = JSON.parse(JSON.stringify(data));
-  normalize(clone);
+// ====== ÇOCUK EKLE ======
+function addChild() {
+  const name = document.getElementById("nameInput").value;
+  if (!selectedPersonId || !name) return;
 
-  const root = d3.hierarchy(clone);
-  const treeLayout = d3.tree().nodeSize([90,150]);
-  treeLayout(root);
+  const parent = findPerson(selectedPersonId);
+  const child = createPerson(name);
 
-  // 🔥 LİNKLER
-  g.selectAll(".link")
-    .data(root.links())
-    .enter()
-    .append("path")
-    .attr("class","link")
-    .attr("d", d=>`
-      M${d.source.x},${d.source.y}
-      V${(d.source.y + d.target.y)/2}
-      H${d.target.x}
-      V${d.target.y}
-    `);
+  parent.children.push(child.id);
+  child.parents.push(parent.id);
 
-  const nodes = g.selectAll(".node")
-    .data(root.descendants().filter(d=>!d.data.ghost))
-    .enter()
-    .append("g")
-    .attr("class","node")
-    .attr("transform", d=>`translate(${d.x},${d.y})`);
+  if (parent.spouse) {
+    const spouse = findPerson(parent.spouse);
+    spouse.children.push(child.id);
+    child.parents.push(spouse.id);
+  }
 
-  // ANA NODE
-  nodes.append("rect")
-    .attr("x",-30)
-    .attr("y",-15)
-    .attr("width",60)
-    .attr("height",30);
+  tree.push(child);
+  renderTree();
+}
 
-  nodes.append("text")
-    .attr("dy",4)
-    .text(d=>d.data.name);
+// ====== EBEVEYN EKLE ======
+function addParent() {
+  const name = document.getElementById("nameInput").value;
+  if (!selectedPersonId || !name) return;
 
-  // 🔥 EŞ DÜZGÜN ÇİZİM
-  nodes.each(function(d){
+  const child = findPerson(selectedPersonId);
+  const parent = createPerson(name);
 
-    if(d.data.spouse){
+  parent.children.push(child.id);
+  child.parents.push(parent.id);
 
-      const offset = 80;
+  tree.push(parent);
+  renderTree();
+}
 
-      // eş kutu
-      d3.select(this)
-        .append("rect")
-        .attr("x",offset-30)
-        .attr("y",-15)
-        .attr("width",60)
-        .attr("height",30);
+// ====== EŞ EKLE ======
+function addSpouse() {
+  const name = document.getElementById("nameInput").value;
+  if (!selectedPersonId || !name) return;
 
-      d3.select(this)
-        .append("text")
-        .attr("x",offset)
-        .attr("dy",4)
-        .text(d.data.spouse.name);
+  const person = findPerson(selectedPersonId);
+  if (person.spouse) return alert("Zaten eşi var");
 
-      // eş çizgi
-      d3.select(this)
-        .append("line")
-        .attr("x1",30)
-        .attr("x2",offset-30)
-        .attr("y1",0)
-        .attr("y2",0)
-        .attr("stroke","black");
+  const spouse = createPerson(name);
 
-      // 🔥 ÇOCUK BAĞLANTI NOKTASI ORTALAMA
-      d.x = d.x + offset/2;
+  person.spouse = spouse.id;
+  spouse.spouse = person.id;
+
+  tree.push(spouse);
+  renderTree();
+}
+
+// ====== İSİM GÜNCELLE ======
+function updateName() {
+  const name = document.getElementById("nameInput").value;
+  if (!selectedPersonId || !name) return;
+
+  const person = findPerson(selectedPersonId);
+  person.name = name;
+
+  renderTree();
+}
+
+// ====== AĞACI ÇİZ ======
+function renderTree() {
+  const container = document.getElementById("tree");
+  container.innerHTML = "";
+
+  // sadece en üst ataları bul
+  const roots = tree.filter(p => p.parents.length === 0);
+
+  roots.forEach(root => {
+    container.appendChild(drawPerson(root));
+  });
+}
+
+// ====== RECURSIVE ÇİZİM ======
+function drawPerson(person) {
+  const div = document.createElement("div");
+
+  div.className = "person";
+  if (person.id === selectedPersonId) {
+    div.classList.add("selected");
+  }
+
+  div.innerText = person.name;
+  div.onclick = () => selectPerson(person.id);
+
+  const wrapper = document.createElement("div");
+  wrapper.appendChild(div);
+
+  // eş göster
+  if (person.spouse) {
+    const spouse = findPerson(person.spouse);
+    if (spouse) {
+      const spouseDiv = document.createElement("div");
+      spouseDiv.className = "person";
+      spouseDiv.innerText = "❤️ " + spouse.name;
+      spouseDiv.onclick = () => selectPerson(spouse.id);
+      wrapper.appendChild(spouseDiv);
     }
-
-  });
-
-  nodes.on("click",(e,d)=>{
-    selectedNode = d.data;
-    document.getElementById("nameInput").value = d.data.name;
-    document.getElementById("modal").style.display="flex";
-  });
-
-}
-
-function closeModal(){
-  document.getElementById("modal").style.display="none";
-}
-
-function save(){
-  selectedNode.name = document.getElementById("nameInput").value;
-  closeModal();
-  updateTree();
-}
-
-function addChild(){
-  if(!selectedNode.children){
-    selectedNode.children = [];
   }
-  selectedNode.children.push({ name:"Yeni" });
-  updateTree();
+
+  // çocuklar
+  if (person.children.length > 0) {
+    const childrenDiv = document.createElement("div");
+
+    person.children.forEach(childId => {
+      const child = findPerson(childId);
+      childrenDiv.appendChild(drawPerson(child));
+    });
+
+    wrapper.appendChild(childrenDiv);
+  }
+
+  return wrapper;
 }
 
-function addSpouse(){
-  selectedNode.spouse = { name:"Eş" };
-  updateTree();
-}
-
-updateTree();
+// ====== BAŞLANGIÇ ======
+const root = createPerson("Ata");
+tree.push(root);
+renderTree();
 
 </script>
 
