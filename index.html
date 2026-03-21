@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı FIX</title>
+<title>Soyağacı FINAL</title>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 
@@ -15,105 +15,47 @@ svg { width:100vw; height:85vh; background:#f5f5f5; }
   fill:white;
   stroke:black;
   stroke-width:2px;
+  rx:6;
 }
 
 .link { stroke:black; fill:none; }
 
-#error {
+.modal {
   position:fixed;
-  top:0;
-  left:0;
-  background:red;
-  color:white;
-  padding:10px;
-  z-index:9999;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.5);
+  display:none;
+  justify-content:center;
+  align-items:center;
 }
+
+.modal-box {
+  background:white;
+  padding:20px;
+  width:300px;
+}
+
+button { margin-top:8px; width:100%; }
 </style>
 </head>
 
 <body>
 
-<div id="error"></div>
 <svg></svg>
 
-<script>
+<!-- POPUP 1 -->
+<div class="modal" id="modal1">
+  <div class="modal-box">
+    <h3>Kişi</h3>
+    <input id="nameInput">
+    <button onclick="save()">Kaydet</button>
+    <button onclick="openAdd()">Kişi ekle</button>
+    <button onclick="closeModal()">Kapat</button>
+  </div>
+</div>
 
-try {
-
-let data = {
-  name:"Ata",
-  children:[
-    {name:"Ahmet", children:[{name:"Ali"},{name:"Ayşe"}]},
-    {name:"Mehmet", children:[{name:"Hasan"},{name:"Zeynep"}]},
-    {name:"Fatma", children:[{name:"Elif"},{name:"Ece"}]}
-  ]
-};
-
-const svg = d3.select("svg");
-const g = svg.append("g");
-
-svg.call(d3.zoom().on("zoom",(e)=>{
-  g.attr("transform",e.transform);
-}));
-
-function normalize(node){
-  if(node.children && node.children.length===1){
-    node.children.push({name:"", ghost:true});
-  }
-  if(node.children){
-    node.children.forEach(normalize);
-  }
-}
-
-function update(){
-
-  g.selectAll("*").remove();
-
-  const clone = JSON.parse(JSON.stringify(data));
-  normalize(clone);
-
-  const root = d3.hierarchy(clone);
-  const tree = d3.tree().nodeSize([100,150]);
-  tree(root);
-
-  g.selectAll(".link")
-    .data(root.links())
-    .enter()
-    .append("path")
-    .attr("class","link")
-    .attr("d",d=>`
-      M${d.source.x},${d.source.y}
-      V${(d.source.y+d.target.y)/2}
-      H${d.target.x}
-      V${d.target.y}
-    `);
-
-  const nodes = g.selectAll(".node")
-    .data(root.descendants().filter(d=>!d.data.ghost))
-    .enter()
-    .append("g")
-    .attr("class","node")
-    .attr("transform",d=>`translate(${d.x},${d.y})`);
-
-  nodes.append("rect")
-    .attr("x",-30)
-    .attr("y",-15)
-    .attr("width",60)
-    .attr("height",30);
-
-  nodes.append("text")
-    .attr("dy",4)
-    .text(d=>d.data.name);
-
-}
-
-update();
-
-} catch(e) {
-  document.getElementById("error").innerText = e;
-}
-
-</script>
-
-</body>
-</html>
+<!-- POPUP 2 -->
+<div class="modal" id="modal2">
+  <div class="modal-box">
+    <h3>Ne ek
