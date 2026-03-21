@@ -18,11 +18,12 @@ svg {
   background: #f5f5f5;
 }
 
-/* NODE */
-.node circle {
+/* NODE KUTU */
+.node rect {
   fill: white;
   stroke: black;
   stroke-width: 2px;
+  rx: 6;
 }
 
 .node text {
@@ -31,10 +32,10 @@ svg {
   pointer-events: none;
 }
 
-/* LINK */
+/* DÜZ ÇİZGİ */
 .link {
   fill: none;
-  stroke: #555;
+  stroke: black;
   stroke-width: 2px;
 }
 
@@ -47,15 +48,14 @@ textarea {
 
 <body>
 
-<h3 style="text-align:center;">🌳 Soyağacı (Zoom + Drag)</h3>
+<h3 style="text-align:center;">🌳 Soyağacı</h3>
 
 <svg></svg>
 
-<textarea id="note" placeholder="Seçili kişi için not yaz..."></textarea>
+<textarea id="note" placeholder="Not yaz..."></textarea>
 
 <script>
 
-// VERİ
 const data = {
   name: "Ata",
   children: [
@@ -77,9 +77,6 @@ const data = {
 };
 
 const svg = d3.select("svg");
-const width = window.innerWidth;
-const height = window.innerHeight;
-
 const g = svg.append("g");
 
 // ZOOM
@@ -89,22 +86,24 @@ svg.call(
   })
 );
 
-// TREE
-const treeLayout = d3.tree().size([width, height - 100]);
+// TREE (YATAY)
+const treeLayout = d3.tree().nodeSize([80, 150]);
 const root = d3.hierarchy(data);
 
 treeLayout(root);
 
-// LINKLER
+// DÜZ LİNK (KESKİN ÇİZGİ)
 g.selectAll(".link")
   .data(root.links())
   .enter()
   .append("path")
   .attr("class", "link")
-  .attr("d", d3.linkVertical()
-    .x(d => d.x)
-    .y(d => d.y)
-  );
+  .attr("d", d => `
+    M${d.source.x},${d.source.y}
+    V${(d.source.y + d.target.y) / 2}
+    H${d.target.x}
+    V${d.target.y}
+  `);
 
 // NODE
 const nodes = g.selectAll(".node")
@@ -114,14 +113,17 @@ const nodes = g.selectAll(".node")
   .attr("class", "node")
   .attr("transform", d => `translate(${d.x},${d.y})`);
 
-nodes.append("circle")
-  .attr("r", 15);
+nodes.append("rect")
+  .attr("x", -30)
+  .attr("y", -15)
+  .attr("width", 60)
+  .attr("height", 30);
 
 nodes.append("text")
   .attr("dy", 4)
   .text(d => d.data.name);
 
-// NOT SİSTEMİ
+// NOT
 let current = "";
 const note = document.getElementById("note");
 
