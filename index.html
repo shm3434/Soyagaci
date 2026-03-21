@@ -1,25 +1,116 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Soyağacı</title>
+<style>
+body { font-family: Arial; text-align:center; }
+
+.node {
+  border: 2px solid black;
+  padding: 8px;
+  margin: 10px;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.row { display:flex; justify-content:center; }
+
+.line {
+  width:2px;
+  height:20px;
+  background:black;
+  margin:0 auto;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Soyağacı</h2>
+
+<div id="tree"></div>
+
+<h3>Not</h3>
+<textarea id="note" rows="4" cols="30"></textarea>
+
+<script>
 const treeData = [
-  {
-    name: "Ata",
-    children: [
-      {
-        name: "Ahmet",
-        children: [
-          { name: "Ali", children: [{name:"Ali Çocuk1"}, {name:"Ali Çocuk2"}] },
-          { name: "Ayşe", children: [{name:"Ayşe Çocuk1"}, {name:"Ayşe Çocuk2"}] },
-          { name: "Mehmet", children: [{name:"Mehmet Çocuk1"}] }
-        ]
-      },
-      {
-        name: "Mehmet",
-        children: [
-          { name: "Hasan", children: [{name:"Hasan Çocuk1"}, {name:"Hasan Çocuk2"}] },
-          { name: "Hüseyin", children: [{name:"Hüseyin Çocuk1"}] },
-          { name: "Zeynep", children: [{name:"Zeynep Çocuk1"}, {name:"Zeynep Çocuk2"}] }
-        ]
-      },
-      {
-        name: "Fatma",
-        children: [
-          { name: "Elif", children: [{name:"Elif Çocuk1"}, {name:"Elif Çocuk2"}] },
-          { name: "Ece", children: [{name:"E
+{
+  name: "Ata",
+  children: [
+    {
+      name: "Ahmet",
+      children: [
+        { name: "Ali", children: [{name:"Ali Çocuk1"}, {name:"Ali Çocuk2"}] },
+        { name: "Ayşe", children: [{name:"Ayşe Çocuk1"}, {name:"Ayşe Çocuk2"}] },
+        { name: "Mehmet", children: [{name:"Mehmet Çocuk1"}] }
+      ]
+    },
+    {
+      name: "Mehmet",
+      children: [
+        { name: "Hasan", children: [{name:"Hasan Çocuk1"}, {name:"Hasan Çocuk2"}] },
+        { name: "Hüseyin", children: [{name:"Hüseyin Çocuk1"}] },
+        { name: "Zeynep", children: [{name:"Zeynep Çocuk1"}, {name:"Zeynep Çocuk2"}] }
+      ]
+    },
+    {
+      name: "Fatma",
+      children: [
+        { name: "Elif", children: [{name:"Elif Çocuk1"}, {name:"Elif Çocuk2"}] },
+        { name: "Ece", children: [{name:"Ece Çocuk1"}, {name:"Ece Çocuk2"}] }
+      ]
+    }
+  ]
+}
+];
+
+const treeDiv = document.getElementById("tree");
+const note = document.getElementById("note");
+
+let current = "";
+
+function createNode(person) {
+  let container = document.createElement("div");
+
+  let div = document.createElement("div");
+  div.className = "node";
+  div.innerText = person.name;
+
+  div.onclick = () => {
+    current = person.name;
+    note.value = localStorage.getItem(current) || "";
+  };
+
+  container.appendChild(div);
+
+  if (person.children) {
+    let line = document.createElement("div");
+    line.className = "line";
+    container.appendChild(line);
+
+    let row = document.createElement("div");
+    row.className = "row";
+
+    person.children.forEach(child => {
+      row.appendChild(createNode(child));
+    });
+
+    container.appendChild(row);
+  }
+
+  return container;
+}
+
+treeDiv.appendChild(createNode(treeData[0]));
+
+note.oninput = () => {
+  if(current) {
+    localStorage.setItem(current, note.value);
+  }
+};
+</script>
+
+</body>
+</html>
