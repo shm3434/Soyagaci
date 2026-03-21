@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı PRO+</title>
+<title>Soyağacı FIXED</title>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 
@@ -65,19 +65,16 @@ button {
 
 <body>
 
-<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
+<h3 style="text-align:center;">🌳 Soyağacı</h3>
 
 <svg></svg>
 
 <div class="modal" id="modal">
   <div class="modal-content">
-    <h3>Kişi</h3>
-    <input id="nameInput" placeholder="İsim">
-    <textarea id="noteInput" placeholder="Not"></textarea>
+    <input id="nameInput">
     <button onclick="save()">Kaydet</button>
     <button onclick="addChild()">Çocuk Ekle</button>
     <button onclick="addSpouse()">Eş Ekle</button>
-    <button onclick="addParent()">Ebeveyn Ekle</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
@@ -101,7 +98,7 @@ svg.call(d3.zoom().on("zoom", (e)=>{
   g.attr("transform", e.transform);
 }));
 
-// 🔥 TEK ÇOCUK DÜZELTME
+// 🔥 TEK ÇOCUK FIX
 function normalize(node){
   if(node.children && node.children.length === 1){
     node.children.push({name:"", ghost:true});
@@ -119,10 +116,10 @@ function updateTree(){
   normalize(clone);
 
   const root = d3.hierarchy(clone);
-  const treeLayout = d3.tree().nodeSize([80,150]);
+  const treeLayout = d3.tree().nodeSize([90,150]);
   treeLayout(root);
 
-  // LINKS
+  // 🔥 LİNKLER
   g.selectAll(".link")
     .data(root.links())
     .enter()
@@ -135,7 +132,6 @@ function updateTree(){
       V${d.target.y}
     `);
 
-  // NODES
   const nodes = g.selectAll(".node")
     .data(root.descendants().filter(d=>!d.data.ghost))
     .enter()
@@ -143,6 +139,7 @@ function updateTree(){
     .attr("class","node")
     .attr("transform", d=>`translate(${d.x},${d.y})`);
 
+  // ANA NODE
   nodes.append("rect")
     .attr("x",-30)
     .attr("y",-15)
@@ -153,39 +150,45 @@ function updateTree(){
     .attr("dy",4)
     .text(d=>d.data.name);
 
-  // 🔥 EŞ ÇİZİMİ
+  // 🔥 EŞ DÜZGÜN ÇİZİM
   nodes.each(function(d){
+
     if(d.data.spouse){
+
+      const offset = 80;
+
+      // eş kutu
       d3.select(this)
         .append("rect")
-        .attr("x",40)
+        .attr("x",offset-30)
         .attr("y",-15)
         .attr("width",60)
         .attr("height",30);
 
       d3.select(this)
         .append("text")
-        .attr("x",70)
+        .attr("x",offset)
         .attr("dy",4)
         .text(d.data.spouse.name);
 
+      // eş çizgi
       d3.select(this)
         .append("line")
         .attr("x1",30)
-        .attr("x2",40)
+        .attr("x2",offset-30)
         .attr("y1",0)
         .attr("y2",0)
         .attr("stroke","black");
+
+      // 🔥 ÇOCUK BAĞLANTI NOKTASI ORTALAMA
+      d.x = d.x + offset/2;
     }
+
   });
 
   nodes.on("click",(e,d)=>{
     selectedNode = d.data;
-
     document.getElementById("nameInput").value = d.data.name;
-    document.getElementById("noteInput").value =
-      localStorage.getItem(d.data.name) || "";
-
     document.getElementById("modal").style.display="flex";
   });
 
@@ -196,39 +199,21 @@ function closeModal(){
 }
 
 function save(){
-  const newName = document.getElementById("nameInput").value;
-
-  localStorage.setItem(newName,
-    document.getElementById("noteInput").value
-  );
-
-  selectedNode.name = newName;
-
+  selectedNode.name = document.getElementById("nameInput").value;
   closeModal();
   updateTree();
 }
 
-// ✅ ÇOCUK
 function addChild(){
   if(!selectedNode.children){
     selectedNode.children = [];
   }
-  selectedNode.children.push({ name:"Yeni Kişi" });
+  selectedNode.children.push({ name:"Yeni" });
   updateTree();
 }
 
-// ✅ EŞ
 function addSpouse(){
   selectedNode.spouse = { name:"Eş" };
-  updateTree();
-}
-
-// ✅ EBEVEYN
-function addParent(){
-  data = {
-    name:"Yeni Üst",
-    children:[data]
-  };
   updateTree();
 }
 
