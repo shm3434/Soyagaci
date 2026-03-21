@@ -2,24 +2,35 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı FINAL FIX</title>
-
-<!-- ALTERNATİF D3 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<title>Soyağacı SAFE</title>
 
 <style>
-body { margin:0; font-family:Arial; }
-
-svg { width:100vw; height:85vh; background:#f5f5f5; }
-
-.node rect {
-  fill:white;
-  stroke:black;
-  stroke-width:2px;
+body {
+  font-family: Arial;
+  margin:0;
+  text-align:center;
 }
 
-.link { stroke:black; fill:none; }
+#tree {
+  overflow:auto;
+  white-space:nowrap;
+  padding:20px;
+}
 
+.node {
+  display:inline-block;
+  border:2px solid black;
+  padding:8px 12px;
+  margin:10px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.children {
+  margin-top:20px;
+}
+
+/* POPUP */
 .modal {
   position:fixed;
   top:0; left:0;
@@ -30,22 +41,25 @@ svg { width:100vw; height:85vh; background:#f5f5f5; }
   align-items:center;
 }
 
-.modal-box {
+.box {
   background:white;
   padding:20px;
   width:300px;
 }
 
-button { margin-top:8px; width:100%; }
+button { margin-top:10px; width:100%; }
 </style>
 </head>
 
 <body>
 
-<svg></svg>
+<h2>🌳 Soyağacı</h2>
 
+<div id="tree"></div>
+
+<!-- POPUP 1 -->
 <div class="modal" id="modal1">
-  <div class="modal-box">
+  <div class="box">
     <input id="nameInput">
     <button onclick="save()">Kaydet</button>
     <button onclick="openAdd()">Kişi ekle</button>
@@ -53,7 +67,97 @@ button { margin-top:8px; width:100%; }
   </div>
 </div>
 
+<!-- POPUP 2 -->
 <div class="modal" id="modal2">
-  <div class="modal-box">
+  <div class="box">
     <button onclick="addChild()">Çocuk ekle</button>
-    <button onclick="alert('sonra eklenecek')">Eş</button
+    <button onclick="alert('sonra')">Eş ekle</button>
+    <button onclick="alert('sonra')">Ebeveyn ekle</button>
+    <button onclick="back()">Geri</button>
+  </div>
+</div>
+
+<script>
+
+let data = {
+  name:"Ata",
+  children:[
+    {name:"Ahmet", children:[{name:"Ali"},{name:"Ayşe"}]},
+    {name:"Mehmet", children:[{name:"Hasan"},{name:"Zeynep"}]},
+    {name:"Fatma", children:[{name:"Elif"},{name:"Ece"}]}
+  ]
+};
+
+let selected=null;
+
+function render(node){
+
+  const div = document.createElement("div");
+
+  const box = document.createElement("div");
+  box.className="node";
+  box.innerText=node.name;
+
+  box.onclick=()=>{
+    selected=node;
+    document.getElementById("nameInput").value=node.name;
+    document.getElementById("modal1").style.display="flex";
+  };
+
+  div.appendChild(box);
+
+  if(node.children){
+    const childDiv=document.createElement("div");
+    childDiv.className="children";
+
+    node.children.forEach(c=>{
+      childDiv.appendChild(render(c));
+    });
+
+    div.appendChild(childDiv);
+  }
+
+  return div;
+}
+
+function update(){
+  const tree=document.getElementById("tree");
+  tree.innerHTML="";
+  tree.appendChild(render(data));
+}
+
+// popup
+function closeModal(){
+  document.getElementById("modal1").style.display="none";
+}
+
+function openAdd(){
+  document.getElementById("modal1").style.display="none";
+  document.getElementById("modal2").style.display="flex";
+}
+
+function back(){
+  document.getElementById("modal2").style.display="none";
+  document.getElementById("modal1").style.display="flex";
+}
+
+// işlemler
+function save(){
+  selected.name=document.getElementById("nameInput").value;
+  closeModal();
+  update();
+}
+
+function addChild(){
+  if(!selected.children) selected.children=[];
+  selected.children.push({name:"Yeni"});
+  document.getElementById("modal2").style.display="none";
+  update();
+}
+
+update();
+
+</script>
+
+</body>
+</html>
