@@ -2,247 +2,201 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı PRO</title>
+<title>Soyağacı PRO+</title>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
 
 <style>
-body {
-  font-family: Arial;
-  text-align: center;
-  background: #f5f5f5;
+body { margin:0; font-family: Arial; }
+
+svg {
+  width:100vw;
+  height:85vh;
+  background:#f5f5f5;
 }
 
-#tree {
-  margin-top: 40px;
+.node rect {
+  fill:white;
+  stroke:black;
+  stroke-width:2px;
+  rx:6;
 }
 
-.person {
-  padding: 10px 15px;
-  border: 2px solid black;
-  border-radius: 10px;
-  cursor: pointer;
-  background: white;
-  min-width: 60px;
-  text-align: center;
+.node text {
+  font-size:12px;
+  text-anchor:middle;
 }
 
-.selected {
-  background: yellow;
+.link {
+  fill:none;
+  stroke:black;
+  stroke-width:2px;
 }
 
-.row {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin: 10px 0;
+.modal {
+  position:fixed;
+  top:0; left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.5);
+  display:none;
+  justify-content:center;
+  align-items:center;
 }
 
-.children {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin-top: 10px;
+.modal-content {
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  width:300px;
 }
 
-.controls {
-  margin-top: 20px;
+input, textarea {
+  width:100%;
+  margin-top:10px;
+}
+
+button {
+  margin-top:10px;
+  width:100%;
 }
 </style>
 </head>
 
 <body>
 
-<h2>Soyağacı</h2>
+<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
 
-<div id="tree"></div>
+<svg></svg>
 
-<div class="controls">
-  <input id="nameInput" placeholder="İsim gir">
-  <br><br>
-  <button onclick="addChild()">Çocuk Ekle</button>
-  <button onclick="addParent()">Ebeveyn Ekle</button>
-  <button onclick="addSpouse()">Eş Ekle</button>
-  <button onclick="updateName()">İsmi Güncelle</button>
-  <button onclick="resetTree()">Sıfırla</button>
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <h3>Kişi</h3>
+    <input id="nameInput" placeholder="İsim">
+    <textarea id="noteInput" placeholder="Not"></textarea>
+    <button onclick="save()">Kaydet</button>
+    <button onclick="addChild()">Çocuk Ekle</button>
+    <button onclick="closeModal()">Kapat</button>
+  </div>
 </div>
 
 <script>
-// ===== STATE =====
-let tree = [];
-let selectedPersonId = null;
+
+// ===== ID ÜRET =====
+function createId(){
+  return Date.now() + Math.random();
+}
+
+// ===== DATA =====
+let data = JSON.parse(localStorage.getItem("treeData")) || {
+  id:createId(),
+  name:"Ata",
+  note:"",
+  children:[
+    { id:createId(), name:"Ahmet", note:"", children:[] },
+    { id:createId(), name:"Mehmet", note:"", children:[] }
+  ]
+};
+
+let selectedNode = null;
+
+const svg = d3.select("svg");
+const g = svg.append("g");
+
+svg.call(d3.zoom().on("zoom", (e)=>{
+  g.attr("transform", e.transform);
+}));
 
 // ===== KAYDET =====
-function saveTree() {
-  localStorage.setItem("familyTree", JSON.stringify(tree));
+function saveTree(){
+  localStorage.setItem("treeData", JSON.stringify(data));
 }
 
-// ===== YÜKLE =====
-function loadTree() {
-  const data = localStorage.getItem("familyTree");
+// ===== TREE =====
+function updateTree(){
 
-  if (data) {
-    tree = JSON.parse(data);
-  } else {
-    const root = createPerson("Ata");
-    tree.push(root);
-  }
+  g.selectAll("*").remove();
+
+  const root = d3.hierarchy(data);
+  const treeLayout = d3.tree().nodeSize([80,150]);
+  treeLayout(root);
+
+  // LINKS
+  g.selectAll(".link")
+    .data(root.links())
+    .enter()
+    .append("path")
+    .attr("class","link")
+    .attr("d", d=>`
+      M${d.source.x},${d.source.y}
+      V${(d.source.y + d.target.y)/2}
+      H${d.target.x}
+      V${d.target.y}
+    `);
+
+  // NODES
+  const nodes = g.selectAll(".node")
+    .data(root.descendants())
+    .enter()
+    .append("g")
+    .attr("class","node")
+    .attr("transform", d=>`translate(${d.x},${d.y})`);
+
+  nodes.append("rect")
+    .attr("x",-30)
+    .attr("y",-15)
+    .attr("width",60)
+    .attr("height",30);
+
+  nodes.append("text")
+    .attr("dy",4)
+    .text(d=>d.data.name);
+
+  nodes.on("click",(e,d)=>{
+    selectedNode = d.data;
+
+    document.getElementById("nameInput").value = d.data.name;
+    document.getElementById("noteInput").value = d.data.note || "";
+
+    document.getElementById("modal").style.display="flex";
+  });
+
 }
 
-// ===== KİŞİ =====
-function createPerson(name) {
-  return {
-    id: Date.now() + Math.random(),
-    name,
-    children: [],
-    parents: [],
-    spouse: null
-  };
+// ===== MODAL =====
+function closeModal(){
+  document.getElementById("modal").style.display="none";
 }
 
-function findPerson(id) {
-  return tree.find(p => p.id === id);
-}
+// ===== KAYDET =====
+function save(){
+  selectedNode.name = document.getElementById("nameInput").value;
+  selectedNode.note = document.getElementById("noteInput").value;
 
-// ===== SEÇ =====
-function selectPerson(id) {
-  selectedPersonId = id;
-  renderTree();
+  saveTree();
+  closeModal();
+  updateTree();
 }
 
 // ===== ÇOCUK =====
-function addChild() {
-  const name = document.getElementById("nameInput").value;
-  if (!selectedPersonId || !name) return;
-
-  const parent = findPerson(selectedPersonId);
-  const child = createPerson(name);
-
-  parent.children.push(child.id);
-  child.parents.push(parent.id);
-
-  if (parent.spouse) {
-    const spouse = findPerson(parent.spouse);
-    spouse.children.push(child.id);
-    child.parents.push(spouse.id);
+function addChild(){
+  if(!selectedNode.children){
+    selectedNode.children = [];
   }
 
-  tree.push(child);
-  renderTree();
-}
-
-// ===== EBEVEYN =====
-function addParent() {
-  const name = document.getElementById("nameInput").value;
-  if (!selectedPersonId || !name) return;
-
-  const child = findPerson(selectedPersonId);
-  const parent = createPerson(name);
-
-  parent.children.push(child.id);
-  child.parents.push(parent.id);
-
-  tree.push(parent);
-  renderTree();
-}
-
-// ===== EŞ =====
-function addSpouse() {
-  const name = document.getElementById("nameInput").value;
-  if (!selectedPersonId || !name) return;
-
-  const person = findPerson(selectedPersonId);
-  if (person.spouse) return alert("Zaten eşi var");
-
-  const spouse = createPerson(name);
-
-  person.spouse = spouse.id;
-  spouse.spouse = person.id;
-
-  tree.push(spouse);
-  renderTree();
-}
-
-// ===== İSİM =====
-function updateName() {
-  const name = document.getElementById("nameInput").value;
-  if (!selectedPersonId || !name) return;
-
-  const person = findPerson(selectedPersonId);
-  person.name = name;
-
-  renderTree();
-}
-
-// ===== SIFIRLA =====
-function resetTree() {
-  localStorage.removeItem("familyTree");
-  location.reload();
-}
-
-// ===== ÇİZ =====
-function renderTree() {
-  const container = document.getElementById("tree");
-  container.innerHTML = "";
-
-  const roots = tree.filter(p => p.parents.length === 0);
-
-  roots.forEach(root => {
-    container.appendChild(drawPerson(root));
+  selectedNode.children.push({
+    id:createId(),
+    name:"Yeni Kişi",
+    note:"",
+    children:[]
   });
 
-  saveTree(); // 🔥 otomatik kayıt
-}
-
-// ===== ÇİZİM =====
-function drawPerson(person) {
-  const wrapper = document.createElement("div");
-
-  const row = document.createElement("div");
-  row.className = "row";
-
-  const personDiv = document.createElement("div");
-  personDiv.className = "person";
-
-  if (person.id === selectedPersonId) {
-    personDiv.classList.add("selected");
-  }
-
-  personDiv.innerText = person.name;
-  personDiv.onclick = () => selectPerson(person.id);
-
-  row.appendChild(personDiv);
-
-  if (person.spouse) {
-    const spouse = findPerson(person.spouse);
-    if (spouse) {
-      const spouseDiv = document.createElement("div");
-      spouseDiv.className = "person";
-      spouseDiv.innerText = "❤️ " + spouse.name;
-      spouseDiv.onclick = () => selectPerson(spouse.id);
-
-      row.appendChild(spouseDiv);
-    }
-  }
-
-  wrapper.appendChild(row);
-
-  if (person.children.length > 0) {
-    const childrenDiv = document.createElement("div");
-    childrenDiv.className = "children";
-
-    person.children.forEach(childId => {
-      const child = findPerson(childId);
-      childrenDiv.appendChild(drawPerson(child));
-    });
-
-    wrapper.appendChild(childrenDiv);
-  }
-
-  return wrapper;
+  saveTree();
+  updateTree();
 }
 
 // ===== BAŞLAT =====
-loadTree();
-renderTree();
+updateTree();
 
 </script>
 
