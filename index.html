@@ -8,14 +8,24 @@
 body {
   font-family: Arial;
   text-align: center;
+  margin: 0;
 }
 
-/* TREE */
+/* SCROLL CONTAINER */
+.tree {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  padding: 20px 0;
+}
+
+/* TREE STRUCTURE */
 .tree ul {
   padding-top: 20px;
   position: relative;
   display: flex;
   justify-content: center;
+  min-width: max-content;
 }
 
 .tree li {
@@ -25,7 +35,7 @@ body {
   padding: 20px 10px 0 10px;
 }
 
-/* ÇİZGİLER */
+/* CONNECTOR LINES */
 .tree li::before, .tree li::after {
   content: '';
   position: absolute;
@@ -55,9 +65,10 @@ body {
   border-radius: 6px;
   cursor: pointer;
   background: white;
+  white-space: nowrap;
 }
 
-/* NOT ALANI */
+/* NOTE BOX */
 textarea {
   margin-top: 20px;
   width: 250px;
