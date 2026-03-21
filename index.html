@@ -71,7 +71,6 @@ button {
 
 <div class="modal" id="modal">
   <div class="modal-content">
-    <h3>Kişi</h3>
     <input id="nameInput">
     <textarea id="noteInput"></textarea>
     <button onclick="save()">Kaydet</button>
@@ -110,12 +109,10 @@ function saveTree(){
   localStorage.setItem("treeData", JSON.stringify(data));
 }
 
-// GENİŞLİK
 function getTextWidth(text){
   return text.length * 7 + 20;
 }
 
-// ===== TREE =====
 function updateTree(){
 
   g.selectAll("*").remove();
@@ -124,7 +121,6 @@ function updateTree(){
   const treeLayout = d3.tree().nodeSize([180,220]);
   treeLayout(root);
 
-  // MERKEZİ GERÇEK ORTA YAP
   root.descendants().forEach(d=>{
     const gap = 10;
 
@@ -137,12 +133,14 @@ function updateTree(){
     d.spouseWidth = spouseWidth;
     d.totalWidth = totalWidth;
 
-    // GERÇEK ORTA
-    d.realX = d.x - totalWidth/2;
+    // 🔥 TAM ORTA (ASİL FIX)
     d.centerX = d.x;
+
+    // SOL BAŞLANGIÇ
+    d.realX = d.centerX - totalWidth/2;
   });
 
-  // LINKS
+  // 🔥 LINKLER TAM ORTADAN
   g.selectAll(".link")
     .data(root.links())
     .enter()
@@ -155,7 +153,6 @@ function updateTree(){
       V${d.target.y}
     `);
 
-  // NODES
   const nodes = g.selectAll(".node")
     .data(root.descendants())
     .enter()
@@ -168,7 +165,7 @@ function updateTree(){
     const gNode = d3.select(this);
     const gap = 10;
 
-    // ANA KİŞİ
+    // ANA
     gNode.append("rect")
       .attr("x",0)
       .attr("y",-15)
@@ -209,10 +206,10 @@ function updateTree(){
         .attr("dy",4)
         .text(d.data.spouse.name);
 
-      // EŞ ÇİZGİSİ (ORTALI)
+      // 🔥 EŞLER ARASI ÇİZGİ (UZATILDI)
       gNode.append("line")
-        .attr("x1", d.mainWidth)
-        .attr("x2", startX)
+        .attr("x1", d.mainWidth - 5)
+        .attr("x2", startX + 5)
         .attr("y1",0)
         .attr("y2",0)
         .attr("stroke","black")
@@ -223,7 +220,7 @@ function updateTree(){
 
 }
 
-// ===== MODAL =====
+// MODAL
 function openModal(person){
   document.getElementById("nameInput").value = person.name;
   document.getElementById("noteInput").value = person.note || "";
@@ -234,7 +231,7 @@ function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 
-// ===== SAVE =====
+// SAVE
 function save(){
 
   const name = document.getElementById("nameInput").value;
@@ -253,7 +250,7 @@ function save(){
   updateTree();
 }
 
-// ===== CHILD =====
+// CHILD
 function addChild(){
 
   if(!selectedNode.children){
@@ -272,7 +269,7 @@ function addChild(){
   updateTree();
 }
 
-// ===== SPOUSE =====
+// SPOUSE
 function addSpouse(){
 
   if(selectedNode.spouse){
@@ -290,12 +287,11 @@ function addSpouse(){
   updateTree();
 }
 
-// ===== SİL =====
+// DELETE
 function deletePerson(){
 
   if(!confirm("Silmek istediğine emin misin?")) return;
 
-  // root silinemez
   if(data === selectedNode){
     alert("Ata silinemez");
     return;
@@ -305,7 +301,6 @@ function deletePerson(){
     if(!parent.children) return;
 
     parent.children = parent.children.filter(c => c !== selectedNode);
-
     parent.children.forEach(child => removeNode(child));
   }
 
@@ -316,7 +311,6 @@ function deletePerson(){
   updateTree();
 }
 
-// ===== START =====
 updateTree();
 
 </script>
