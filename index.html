@@ -2,35 +2,29 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı PRO+</title>
-
+<title>Soyağacı PRO</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 
 <style>
-body { margin:0; font-family: Arial; }
+body { margin:0; font-family:Arial; }
+svg { width:100vw; height:90vh; background:#f5f5f5; }
 
-svg {
-  width:100vw;
-  height:85vh;
-  background:#f5f5f5;
-}
-
-.node rect {
-  fill:white;
+.box {
+  fill:#f4a261;
+  rx:8;
   stroke:black;
-  stroke-width:2px;
-  rx:6;
 }
 
-.node text {
+.text {
   font-size:12px;
   text-anchor:middle;
+  fill:white;
 }
 
-.link {
-  fill:none;
+.line {
   stroke:black;
-  stroke-width:2px;
+  stroke-width:2;
+  fill:none;
 }
 </style>
 </head>
@@ -41,147 +35,136 @@ svg {
 
 <script>
 
-function createId(){
-  return Date.now() + Math.random();
-}
-
-let data = {
-  id:createId(),
-  name:"Ata",
-  spouse:{name:"Eş"},
-  children:[]
-};
-
 const svg = d3.select("svg");
 const g = svg.append("g");
 
-svg.call(d3.zoom().on("zoom", (e)=>{
-  g.attr("transform", e.transform);
-}));
+const boxW = 80;
+const boxH = 30;
+const gapX = 40;
+const gapY = 100;
 
-function getTextWidth(text){
-  return text.length * 7 + 20;
-}
-
-function updateTree(){
-
-  g.selectAll("*").remove();
-
-  const root = d3.hierarchy(data);
-
-  const gap = 30; // temel boşluk
-  const spouseLineExtra = gap * 0.5; // 🔥 1.5x çizgi
-
-  const treeLayout = d3.tree().nodeSize([200,220]);
-  treeLayout(root);
-
-  // 🔥 TÜM NODE MERKEZ HESABI (ASIL FIX)
-  root.descendants().forEach(d=>{
-
-    const mainWidth = getTextWidth(d.data.name);
-    const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
-
-    d.mainWidth = mainWidth;
-    d.spouseWidth = spouseWidth;
-
-    if(d.data.spouse){
-      d.totalWidth = mainWidth + gap + spouseWidth;
-
-      // 🔥 GERÇEK ORTA (TÜM NESİLLER İÇİN)
-      d.centerX = d.x + gap/2;
-
-    } else {
-      d.totalWidth = mainWidth;
-      d.centerX = d.x;
-    }
-
-    d.realX = d.centerX - d.totalWidth/2;
-  });
-
-  // 🔥 TÜM ÇİZGİLER ORTADAN (HER NESİL)
-  g.selectAll(".link")
-    .data(root.links())
-    .enter()
-    .append("path")
-    .attr("class","link")
-    .attr("d", d=>`
-      M${d.source.centerX},${d.source.y}
-      V${(d.source.y + d.target.y)/2}
-      H${d.target.centerX}
-      V${d.target.y}
-    `);
-
-  const nodes = g.selectAll(".node")
-    .data(root.descendants())
-    .enter()
-    .append("g")
-    .attr("transform", d=>`translate(${d.realX},${d.y})`);
-
-  nodes.each(function(d){
-
-    const gNode = d3.select(this);
-
-    // ANA
-    gNode.append("rect")
-      .attr("x",0)
-      .attr("y",-15)
-      .attr("width",d.mainWidth)
-      .attr("height",30);
-
-    gNode.append("text")
-      .attr("x",d.mainWidth/2)
-      .attr("dy",4)
-      .text(d.data.name);
-
-    // EŞ
-    if(d.data.spouse){
-
-      const startX = d.mainWidth + gap;
-
-      gNode.append("rect")
-        .attr("x",startX)
-        .attr("y",-15)
-        .attr("width",d.spouseWidth)
-        .attr("height",30)
-        .attr("fill","#ffe6e6");
-
-      gNode.append("text")
-        .attr("x",startX + d.spouseWidth/2)
-        .attr("dy",4)
-        .text(d.data.spouse.name);
-
-      // 🔥 1.5x EŞ ÇİZGİSİ (DIŞTAN)
-      gNode.append("line")
-        .attr("x1", d.mainWidth - spouseLineExtra)
-        .attr("x2", startX + spouseLineExtra)
-        .attr("y1",0)
-        .attr("y2",0)
-        .attr("stroke","black")
-        .attr("stroke-width",2);
-    }
-
-  });
-
-}
-
-// TEST
-data.children.push({
-  id:createId(),
-  name:"Yeni Kişi",
-  spouse:{name:"Eş"},
+// veri
+const data = {
+  name:"Ata",
+  spouse:"Eş",
   children:[
-    {id:createId(), name:"Yeni Kişi"},
-    {id:createId(), name:"Yeni Kişi"}
+    {
+      name:"Ahmet",
+      spouse:"Eş",
+      children:[
+        {name:"Ali"},
+        {name:"Ayşe"}
+      ]
+    },
+    {
+      name:"Mehmet",
+      spouse:"Eş",
+      children:[
+        {name:"Hasan"},
+        {name:"Zeynep"}
+      ]
+    }
   ]
-});
+};
 
-data.children.push({
-  id:createId(),
-  name:"Yeni Kişi",
-  children:[]
-});
+// node genişliği hesap
+function getWidth(node){
+  if(!node.children) return boxW;
 
-updateTree();
+  let total = 0;
+  node.children.forEach(c=>{
+    total += getWidth(c) + gapX;
+  });
+
+  return Math.max(boxW*2, total);
+}
+
+// çizim
+function draw(node, x, y){
+
+  const center = x;
+
+  // ana kişi
+  g.append("rect")
+    .attr("class","box")
+    .attr("x", center - boxW - 5)
+    .attr("y", y)
+    .attr("width", boxW)
+    .attr("height", boxH);
+
+  g.append("text")
+    .attr("class","text")
+    .attr("x", center - boxW/2 - 5)
+    .attr("y", y + 20)
+    .text(node.name);
+
+  // eş
+  if(node.spouse){
+    g.append("rect")
+      .attr("class","box")
+      .attr("x", center + 5)
+      .attr("y", y)
+      .attr("width", boxW)
+      .attr("height", boxH);
+
+    g.append("text")
+      .attr("class","text")
+      .attr("x", center + boxW/2 + 5)
+      .attr("y", y + 20)
+      .text(node.spouse);
+
+    // eş çizgisi
+    g.append("line")
+      .attr("class","line")
+      .attr("x1", center - 5)
+      .attr("x2", center + 5)
+      .attr("y1", y + boxH/2)
+      .attr("y2", y + boxH/2);
+  }
+
+  // çocuklar
+  if(node.children){
+
+    const totalWidth = getWidth(node);
+    let startX = center - totalWidth/2;
+
+    // aşağı çizgi
+    g.append("line")
+      .attr("class","line")
+      .attr("x1", center)
+      .attr("x2", center)
+      .attr("y1", y + boxH)
+      .attr("y2", y + gapY/2);
+
+    // yatay çizgi
+    g.append("line")
+      .attr("class","line")
+      .attr("x1", startX)
+      .attr("x2", startX + totalWidth)
+      .attr("y1", y + gapY/2)
+      .attr("y2", y + gapY/2);
+
+    node.children.forEach(child=>{
+
+      const childWidth = getWidth(child);
+      const childCenter = startX + childWidth/2;
+
+      // aşağı bağlantı
+      g.append("line")
+        .attr("class","line")
+        .attr("x1", childCenter)
+        .attr("x2", childCenter)
+        .attr("y1", y + gapY/2)
+        .attr("y2", y + gapY);
+
+      draw(child, childCenter, y + gapY);
+
+      startX += childWidth + gapX;
+    });
+  }
+}
+
+draw(data, window.innerWidth/2, 50);
 
 </script>
 
