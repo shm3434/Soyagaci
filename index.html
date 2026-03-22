@@ -8,20 +8,65 @@
 
 <style>
 body { margin:0; font-family: Arial; }
-svg { width:100vw; height:85vh; background:#f5f5f5; }
-.node rect { fill:white; stroke:black; stroke-width:2px; rx:6; }
-.node text { font-size:12px; text-anchor:middle; }
-.link { fill:none; stroke:black; stroke-width:2px; }
-.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; justify-content:center; align-items:center; }
-.modal-content { background:white; padding:20px; border-radius:10px; width:300px; }
-input, textarea { width:100%; margin-top:10px; }
-button { margin-top:10px; width:100%; }
+
+svg {
+  width:100vw;
+  height:85vh;
+  background:#f5f5f5;
+}
+
+.node rect {
+  fill:white;
+  stroke:black;
+  stroke-width:2px;
+  rx:6;
+}
+
+.node text {
+  font-size:12px;
+  text-anchor:middle;
+}
+
+.link {
+  fill:none;
+  stroke:black;
+  stroke-width:2px;
+}
+
+.modal {
+  position:fixed;
+  top:0; left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.5);
+  display:none;
+  justify-content:center;
+  align-items:center;
+}
+
+.modal-content {
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  width:300px;
+}
+
+input, textarea {
+  width:100%;
+  margin-top:10px;
+}
+
+button {
+  margin-top:10px;
+  width:100%;
+}
 </style>
 </head>
 
 <body>
 
 <h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
+
 <svg></svg>
 
 <div class="modal" id="modal">
@@ -43,24 +88,16 @@ function createId(){
   return Date.now() + Math.random();
 }
 
-let nodesMap = {};
-
-function register(node){
-  nodesMap[node.id] = node;
-  if(node.children){
-    node.children.forEach(register);
-  }
-}
-
 let data = JSON.parse(localStorage.getItem("treeData")) || {
   id:createId(),
   name:"Ata",
+  note:"",
+  spouse:null,
   children:[]
 };
 
-register(data);
-
 let selectedNode = null;
+let selectedType = "self";
 
 const svg = d3.select("svg");
 const g = svg.append("g");
@@ -77,13 +114,62 @@ function getTextWidth(text){
   return text.length * 7 + 20;
 }
 
+function getMaxChildren(node){
+  let max = node.children ? node.children.length : 0;
+  if(node.children){
+    node.children.forEach(c=>{
+      max = Math.max(max, getMaxChildren(c));
+    });
+  }
+  return max;
+}
+
 function updateTree(){
 
   g.selectAll("*").remove();
 
   const root = d3.hierarchy(data);
-  const treeLayout = d3.tree().nodeSize([180,200]);
+
+  const maxChildren = getMaxChildren(data);
+  const dynamicSpacing = Math.max(150, maxChildren * 70);
+
+  const treeLayout = d3.tree().nodeSize([dynamicSpacing,200]);
   treeLayout(root);
+
+  root.descendants().forEach(d=>{
+    if(d.children && d.children.length){
+      const avg = d3.mean(d.children, c => c.x);
+      d.x = avg;
+    }
+  });
+
+  root.descendants().forEach(d=>{
+
+    const gap = 60;
+
+    const mainWidth = getTextWidth(d.data.name);
+    const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
+
+    d.mainWidth = mainWidth;
+    d.spouseWidth = spouseWidth;
+
+    if(d.data.spouse){
+      d.totalWidth = mainWidth + gap + spouseWidth;
+    } else {
+      d.totalWidth = mainWidth;
+    }
+
+    d.realX = d.x - d.totalWidth/2;
+
+    d.linkX = d.realX + (d.mainWidth / 2);
+
+    if(d.data.spouse){
+      d.childCenterX = d.realX + d.mainWidth + (gap / 2);
+    } else {
+      d.childCenterX = d.realX + (d.mainWidth / 2);
+    }
+
+  });
 
   g.selectAll(".link")
     .data(root.links())
@@ -91,9 +177,9 @@ function updateTree(){
     .append("path")
     .attr("class","link")
     .attr("d", d=>`
-      M${d.source.x},${d.source.y}
+      M${d.source.childCenterX},${d.source.y}
       V${(d.source.y + d.target.y)/2}
-      H${d.target.x}
+      H${d.target.linkX}
       V${d.target.y}
     `);
 
@@ -102,48 +188,129 @@ function updateTree(){
     .enter()
     .append("g")
     .attr("class","node")
-    .attr("transform", d=>`translate(${d.x},${d.y})`);
+    .attr("transform", d=>`translate(${d.realX},${d.y})`);
 
   nodes.each(function(d){
 
-    const node = d.data;
     const gNode = d3.select(this);
-    const width = getTextWidth(node.name);
+    const gap = 60;
 
     gNode.append("rect")
-      .attr("x",-width/2)
+      .attr("x",0)
       .attr("y",-15)
-      .attr("width",width)
+      .attr("width",d.mainWidth)
       .attr("height",30)
       .on("click",(e)=>{
-        selectedNode = node;
-        openModal(node);
+        selectedNode = d.data;
+        selectedType = "self";
+        openModal(d.data);
         e.stopPropagation();
       });
 
     gNode.append("text")
+      .attr("x",d.mainWidth/2)
       .attr("dy",4)
-      .text(node.name);
+      .text(d.data.name);
 
-    // 🔥 EŞ ÇİZGİSİ (ID ile)
-    if(node.spouseId){
-      const spouse = nodesMap[node.spouseId];
-      if(spouse){
-        g.append("line")
-          .attr("x1", d.x)
-          .attr("y1", d.y)
-          .attr("x2", d.x + 60)
-          .attr("y2", d.y)
-          .attr("stroke","black");
-      }
+    if(d.data.spouse){
+
+      const startX = d.mainWidth + gap;
+
+      gNode.append("rect")
+        .attr("x",startX)
+        .attr("y",-15)
+        .attr("width",d.spouseWidth)
+        .attr("height",30)
+        .attr("fill","#ffe6e6")
+        .on("click",(e)=>{
+          selectedNode = d.data.spouse;
+          selectedType = "spouse";
+          openModal(d.data.spouse);
+          e.stopPropagation();
+        });
+
+      gNode.append("text")
+        .attr("x",startX + d.spouseWidth/2)
+        .attr("dy",4)
+        .text(d.data.spouse.name);
+
+      gNode.append("line")
+        .attr("x1", d.mainWidth)
+        .attr("x2", startX)
+        .attr("y1",0)
+        .attr("y2",0)
+        .attr("stroke","black")
+        .attr("stroke-width",2);
     }
 
   });
 
 }
 
+// 🔥 GERÇEK DOĞRU FIX
+function addParent(){
+
+  function insertParent(node){
+
+    if(!node.children) return;
+
+    node.children = node.children.map(c=>{
+
+      // NORMAL
+      if(selectedType === "self" && c.id === selectedNode.id){
+        return {
+          id:createId(),
+          name:"Yeni Ebeveyn",
+          note:"",
+          spouse:null,
+          children:[c]
+        };
+      }
+
+      // 🔥 SADECE EŞİ TAŞI
+      if(selectedType === "spouse" && c.spouse && c.spouse.id === selectedNode.id){
+
+        const parentNode = {
+          id:createId(),
+          name:"Yeni Ebeveyn",
+          note:"",
+          spouse:null,
+          children:[c.spouse]
+        };
+
+        // eşi kaldır ama kişiyi bozma
+        c.spouse = null;
+
+        // eş yukarı çıktı, kişi olduğu gibi kalır
+        return c;
+      }
+
+      insertParent(c);
+      return c;
+
+    });
+  }
+
+  if(selectedType === "self" && data.id === selectedNode.id){
+    data = {
+      id:createId(),
+      name:"Yeni Ebeveyn",
+      note:"",
+      spouse:null,
+      children:[data]
+    };
+  } else {
+    insertParent(data);
+  }
+
+  saveTree();
+  closeModal();
+  updateTree();
+}
+
 function openModal(person){
   document.getElementById("nameInput").value = person.name;
+  document.getElementById("noteInput").value = person.note || "";
   document.getElementById("modal").style.display="flex";
 }
 
@@ -154,93 +321,57 @@ function closeModal(){
 function save(){
   selectedNode.name = document.getElementById("nameInput").value;
   saveTree();
-  updateTree();
   closeModal();
+  updateTree();
 }
 
 function addChild(){
-  if(!selectedNode.children) selectedNode.children=[];
-  const child = {
+  if(!selectedNode.children){
+    selectedNode.children = [];
+  }
+  selectedNode.children.push({
     id:createId(),
     name:"Yeni Kişi",
+    note:"",
+    spouse:null,
     children:[]
-  };
-  selectedNode.children.push(child);
-  register(child);
+  });
   saveTree();
   updateTree();
 }
 
 function addSpouse(){
-
-  if(selectedNode.spouseId){
+  if(selectedNode.spouse){
     alert("Zaten eşi var");
     return;
   }
-
-  const spouse = {
+  selectedNode.spouse = {
     id:createId(),
     name:"Eş",
-    children:[]
+    note:""
   };
-
-  selectedNode.spouseId = spouse.id;
-  spouse.spouseId = selectedNode.id;
-
-  register(spouse);
-
-  // aynı seviyeye ekle
-  function insert(node){
-    if(node.children){
-      node.children.push(spouse);
-      node.children.forEach(insert);
-    }
-  }
-
-  insert(data);
-
   saveTree();
   updateTree();
 }
 
-function addParent(){
-
-  function insert(node){
-
-    if(!node.children) return;
-
-    node.children = node.children.map(c=>{
-
-      if(c.id === selectedNode.id){
-        return {
-          id:createId(),
-          name:"Yeni Ebeveyn",
-          children:[c]
-        };
-      }
-
-      insert(c);
-      return c;
-
-    });
+function deletePerson(){
+  if(!confirm("Silmek istediğine emin misin?")) return;
+  if(data === selectedNode){
+    alert("Ata silinemez");
+    return;
   }
 
-  if(data.id === selectedNode.id){
-    data = {
-      id:createId(),
-      name:"Yeni Ebeveyn",
-      children:[data]
-    };
-  } else {
-    insert(data);
+  function removeNode(parent){
+    if(!parent.children) return;
+    parent.children = parent.children.filter(c => c !== selectedNode);
+    parent.children.forEach(removeNode);
   }
 
+  removeNode(data);
   saveTree();
-  updateTree();
   closeModal();
+  updateTree();
 }
-
-function deletePerson(){}
 
 updateTree();
 
