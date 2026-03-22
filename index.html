@@ -10,21 +10,42 @@ body { margin:0; font-family:Arial; }
 svg { width:100vw; height:90vh; background:#f5f5f5; }
 
 .box {
-  fill:#f4a261;
-  rx:8;
+  fill:white;
   stroke:black;
+  rx:6;
 }
 
 .text {
   font-size:12px;
   text-anchor:middle;
-  fill:white;
 }
 
 .line {
   stroke:black;
   stroke-width:2;
   fill:none;
+}
+
+.modal {
+  position:fixed;
+  top:0;left:0;
+  width:100%;height:100%;
+  background:rgba(0,0,0,0.5);
+  display:none;
+  justify-content:center;
+  align-items:center;
+}
+
+.modal-content {
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  width:300px;
+}
+
+button,input {
+  width:100%;
+  margin-top:10px;
 }
 </style>
 </head>
@@ -33,138 +54,194 @@ svg { width:100vw; height:90vh; background:#f5f5f5; }
 
 <svg></svg>
 
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <input id="nameInput">
+    <button onclick="save()">Kaydet</button>
+    <button onclick="addChild()">Çocuk Ekle</button>
+    <button onclick="addSpouse()">Eş Ekle</button>
+    <button onclick="deleteNode()">Sil</button>
+    <button onclick="closeModal()">Kapat</button>
+  </div>
+</div>
+
 <script>
 
-const svg = d3.select("svg");
-const g = svg.append("g");
+function id(){ return Date.now()+Math.random(); }
 
-const boxW = 80;
-const boxH = 30;
-const gapX = 40;
-const gapY = 100;
-
-// veri
-const data = {
+let data = {
+  id:id(),
   name:"Ata",
-  spouse:"Eş",
-  children:[
-    {
-      name:"Ahmet",
-      spouse:"Eş",
-      children:[
-        {name:"Ali"},
-        {name:"Ayşe"}
-      ]
-    },
-    {
-      name:"Mehmet",
-      spouse:"Eş",
-      children:[
-        {name:"Hasan"},
-        {name:"Zeynep"}
-      ]
-    }
-  ]
+  spouse:{name:"Eş"},
+  children:[]
 };
 
-// node genişliği hesap
-function getWidth(node){
-  if(!node.children) return boxW;
+let selected=null;
+let type="self";
 
-  let total = 0;
-  node.children.forEach(c=>{
-    total += getWidth(c) + gapX;
+const svg=d3.select("svg");
+const g=svg.append("g");
+
+svg.call(d3.zoom().on("zoom", e=>{
+  g.attr("transform",e.transform);
+}));
+
+const boxW=80, boxH=30, gapX=20, gapY=90;
+
+function getWidth(n){
+  if(!n.children || n.children.length===0) return boxW*2;
+
+  let w=0;
+  n.children.forEach(c=>{
+    w+=getWidth(c);
   });
 
-  return Math.max(boxW*2, total);
+  return Math.max(w, boxW*2);
 }
 
-// çizim
-function draw(node, x, y){
+function draw(n,x,y){
 
-  const center = x;
+  const center=x;
 
-  // ana kişi
+  // ANA
   g.append("rect")
     .attr("class","box")
-    .attr("x", center - boxW - 5)
-    .attr("y", y)
-    .attr("width", boxW)
-    .attr("height", boxH);
+    .attr("x",center-boxW-5)
+    .attr("y",y)
+    .attr("width",boxW)
+    .attr("height",boxH)
+    .on("click",()=>{
+      selected=n; type="self"; openModal(n);
+    });
 
   g.append("text")
     .attr("class","text")
-    .attr("x", center - boxW/2 - 5)
-    .attr("y", y + 20)
-    .text(node.name);
+    .attr("x",center-boxW/2-5)
+    .attr("y",y+20)
+    .text(n.name);
 
-  // eş
-  if(node.spouse){
+  // EŞ
+  if(n.spouse){
     g.append("rect")
       .attr("class","box")
-      .attr("x", center + 5)
-      .attr("y", y)
-      .attr("width", boxW)
-      .attr("height", boxH);
+      .attr("x",center+5)
+      .attr("y",y)
+      .attr("width",boxW)
+      .attr("height",boxH)
+      .on("click",()=>{
+        selected=n; type="spouse"; openModal(n.spouse);
+      });
 
     g.append("text")
       .attr("class","text")
-      .attr("x", center + boxW/2 + 5)
-      .attr("y", y + 20)
-      .text(node.spouse);
+      .attr("x",center+boxW/2+5)
+      .attr("y",y+20)
+      .text(n.spouse.name);
 
-    // eş çizgisi
     g.append("line")
       .attr("class","line")
-      .attr("x1", center - 5)
-      .attr("x2", center + 5)
-      .attr("y1", y + boxH/2)
-      .attr("y2", y + boxH/2);
+      .attr("x1",center-5)
+      .attr("x2",center+5)
+      .attr("y1",y+boxH/2)
+      .attr("y2",y+boxH/2);
   }
 
-  // çocuklar
-  if(node.children){
+  if(n.children && n.children.length){
 
-    const totalWidth = getWidth(node);
-    let startX = center - totalWidth/2;
+    let total=getWidth(n);
+    let start=center-total/2;
 
-    // aşağı çizgi
+    // aşağı
     g.append("line")
       .attr("class","line")
-      .attr("x1", center)
-      .attr("x2", center)
-      .attr("y1", y + boxH)
-      .attr("y2", y + gapY/2);
+      .attr("x1",center)
+      .attr("x2",center)
+      .attr("y1",y+boxH)
+      .attr("y2",y+gapY/2);
 
-    // yatay çizgi
+    // yatay
     g.append("line")
       .attr("class","line")
-      .attr("x1", startX)
-      .attr("x2", startX + totalWidth)
-      .attr("y1", y + gapY/2)
-      .attr("y2", y + gapY/2);
+      .attr("x1",start)
+      .attr("x2",start+total)
+      .attr("y1",y+gapY/2)
+      .attr("y2",y+gapY/2);
 
-    node.children.forEach(child=>{
+    n.children.forEach(c=>{
+      let w=getWidth(c);
+      let cx=start+w/2;
 
-      const childWidth = getWidth(child);
-      const childCenter = startX + childWidth/2;
-
-      // aşağı bağlantı
       g.append("line")
         .attr("class","line")
-        .attr("x1", childCenter)
-        .attr("x2", childCenter)
-        .attr("y1", y + gapY/2)
-        .attr("y2", y + gapY);
+        .attr("x1",cx)
+        .attr("x2",cx)
+        .attr("y1",y+gapY/2)
+        .attr("y2",y+gapY);
 
-      draw(child, childCenter, y + gapY);
+      draw(c,cx,y+gapY);
 
-      startX += childWidth + gapX;
+      start+=w;
     });
   }
 }
 
-draw(data, window.innerWidth/2, 50);
+function update(){
+  g.selectAll("*").remove();
+  draw(data, window.innerWidth/2, 40);
+}
+
+// MODAL
+function openModal(p){
+  document.getElementById("nameInput").value=p.name;
+  document.getElementById("modal").style.display="flex";
+}
+
+function closeModal(){
+  document.getElementById("modal").style.display="none";
+}
+
+function save(){
+  let val=document.getElementById("nameInput").value;
+  if(type==="self") selected.name=val;
+  else selected.spouse.name=val;
+
+  closeModal(); update();
+}
+
+function addChild(){
+  if(!selected.children) selected.children=[];
+  selected.children.push({
+    id:id(),
+    name:"Yeni",
+    spouse:null,
+    children:[]
+  });
+  update();
+}
+
+function addSpouse(){
+  if(selected.spouse) return;
+  selected.spouse={name:"Eş"};
+  update();
+}
+
+function deleteNode(){
+
+  function remove(parent){
+    if(!parent.children) return;
+
+    parent.children=parent.children.filter(c=>c!==selected);
+    parent.children.forEach(remove);
+  }
+
+  if(selected!==data){
+    remove(data);
+  }
+
+  update();
+}
+
+update();
 
 </script>
 
