@@ -113,12 +113,28 @@ function getTextWidth(text){
   return text.length * 7 + 20;
 }
 
+// 🔥 YENİ: EN ALTTAKİ MAX KARDEŞ SAYISI
+function getMaxChildren(node){
+  let max = node.children ? node.children.length : 0;
+  if(node.children){
+    node.children.forEach(c=>{
+      max = Math.max(max, getMaxChildren(c));
+    });
+  }
+  return max;
+}
+
 function updateTree(){
 
   g.selectAll("*").remove();
 
   const root = d3.hierarchy(data);
-  const treeLayout = d3.tree().nodeSize([150,200]);
+
+  // 🔥 AKILLI SPACING
+  const maxChildren = getMaxChildren(data);
+  const dynamicSpacing = Math.max(150, maxChildren * 70);
+
+  const treeLayout = d3.tree().nodeSize([dynamicSpacing,200]);
   treeLayout(root);
 
   root.descendants().forEach(d=>{
@@ -139,10 +155,8 @@ function updateTree(){
 
     d.realX = d.x - d.totalWidth/2;
 
-    // 🔥 ÜSTTEN GELEN ÇİZGİ (ANA KİŞİ)
     d.linkX = d.realX + (d.mainWidth / 2);
 
-    // 🔥 ÇOCUKLARIN MERKEZİ (EŞ VARSA ORTA)
     if(d.data.spouse){
       d.childCenterX = d.realX + d.mainWidth + (gap / 2);
     } else {
