@@ -247,7 +247,7 @@ function updateTree(){
 
 }
 
-// 🔥 SADECE BURASI DÜZELTİLDİ
+// 🔥 SADECE BU FONKSİYON DEĞİŞTİ
 function addParent(){
 
   function insertParent(node){
@@ -270,15 +270,15 @@ function addParent(){
 
       if(selectedType === "spouse" && c.spouse && c.spouse.id === selectedNode.id){
 
+        const oldSpouse = c.spouse;
+        c.spouse = null;
+
         return {
           id:createId(),
           name:"Yeni Ebeveyn",
           note:"",
           spouse:null,
-          children:[{
-            ...c,
-            spouse: c.spouse
-          }]
+          children:[oldSpouse]
         };
 
       }
