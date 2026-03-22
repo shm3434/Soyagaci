@@ -118,12 +118,15 @@ function updateTree(){
   g.selectAll("*").remove();
 
   const root = d3.hierarchy(data);
-  const treeLayout = d3.tree().nodeSize([200,220]);
+
+  // 🔥 EKRANA GÖRE AUTO SPACING
+  const screenWidth = window.innerWidth;
+  const gap = Math.max(30, screenWidth * 0.02);
+
+  const treeLayout = d3.tree().nodeSize([gap * 6, 220]);
   treeLayout(root);
 
-  // ölçü hesap
   root.descendants().forEach(d=>{
-    const gap = 20;
 
     const mainWidth = getTextWidth(d.data.name);
     const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
@@ -134,8 +137,8 @@ function updateTree(){
     if(d.data.spouse){
       d.totalWidth = mainWidth + gap + spouseWidth;
 
-      // gerçek merkez = eşler arası çizginin ortası
-      d.centerX = d.x + (gap/2);
+      // 🔥 GERÇEK MERKEZ = EŞ ÇİZGİ ORTASI
+      d.centerX = d.x + gap/2;
     } else {
       d.totalWidth = mainWidth;
       d.centerX = d.x;
@@ -144,7 +147,7 @@ function updateTree(){
     d.realX = d.centerX - d.totalWidth/2;
   });
 
-  // linkler (tam ortadan)
+  // 🔥 ÇOCUK ÇİZGİSİ %100 ORTA
   g.selectAll(".link")
     .data(root.links())
     .enter()
@@ -167,9 +170,8 @@ function updateTree(){
   nodes.each(function(d){
 
     const gNode = d3.select(this);
-    const gap = 20;
 
-    // ana kişi
+    // ANA
     gNode.append("rect")
       .attr("x",0)
       .attr("y",-15)
@@ -187,6 +189,7 @@ function updateTree(){
       .attr("dy",4)
       .text(d.data.name);
 
+    // EŞ
     if(d.data.spouse){
 
       const startX = d.mainWidth + gap;
@@ -209,7 +212,7 @@ function updateTree(){
         .attr("dy",4)
         .text(d.data.spouse.name);
 
-      // eş çizgisi (kutuların DIŞINDAN ve uzun)
+      // 🔥 RESPONSIVE EŞ ÇİZGİSİ
       gNode.append("line")
         .attr("x1", d.mainWidth)
         .attr("x2", startX)
@@ -223,7 +226,7 @@ function updateTree(){
 
 }
 
-// modal
+// MODAL
 function openModal(person){
   document.getElementById("nameInput").value = person.name;
   document.getElementById("noteInput").value = person.note || "";
@@ -234,7 +237,7 @@ function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 
-// save
+// SAVE
 function save(){
   const name = document.getElementById("nameInput").value;
   const note = document.getElementById("noteInput").value;
@@ -252,7 +255,7 @@ function save(){
   updateTree();
 }
 
-// çocuk
+// CHILD
 function addChild(){
 
   if(!selectedNode.children){
@@ -271,7 +274,7 @@ function addChild(){
   updateTree();
 }
 
-// eş
+// SPOUSE
 function addSpouse(){
 
   if(selectedNode.spouse){
@@ -289,7 +292,7 @@ function addSpouse(){
   updateTree();
 }
 
-// sil
+// DELETE
 function deletePerson(){
 
   if(!confirm("Silmek istediğine emin misin?")) return;
@@ -313,7 +316,9 @@ function deletePerson(){
   updateTree();
 }
 
-// başlangıç
+// resize olunca yeniden çiz
+window.addEventListener("resize", updateTree);
+
 updateTree();
 
 </script>
