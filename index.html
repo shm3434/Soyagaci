@@ -83,16 +83,18 @@ function updateTree(){
 
     if(d.data.spouse){
       d.totalWidth = mainWidth + gap + spouseWidth;
-      d.centerX = d.x + gap/2;
     } else {
       d.totalWidth = mainWidth;
-      d.centerX = d.x;
     }
 
-    d.realX = d.centerX - d.totalWidth/2;
+    d.realX = d.x - d.totalWidth/2;
 
-    // 🔥 SADECE BURASI EKLENDİ (çıkış düzeltme)
-    d.linkX = d.data.spouse ? d.centerX : d.centerX;
+    // 🔥 ASIL DÜZELTME (ÇIKIŞ NOKTASI)
+    if(d.data.spouse){
+      d.linkX = d.realX + d.mainWidth + (gap / 2);
+    } else {
+      d.linkX = d.realX + (d.mainWidth / 2);
+    }
 
   });
 
@@ -151,4 +153,18 @@ function updateTree(){
         .attr("x1", d.mainWidth)
         .attr("x2", startX)
         .attr("y1",0)
-        .attr("y2",
+        .attr("y2",0)
+        .attr("stroke","black")
+        .attr("stroke-width",2);
+    }
+
+  });
+
+}
+
+updateTree();
+
+</script>
+
+</body>
+</html>
