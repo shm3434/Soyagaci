@@ -123,7 +123,6 @@ function updateTree(){
 
   root.descendants().forEach(d=>{
 
-    // === EŞ MESAFESİ ===
     const gap = 20;
 
     const mainWidth = getTextWidth(d.data.name);
@@ -134,7 +133,10 @@ function updateTree(){
 
     if(d.data.spouse){
       d.totalWidth = mainWidth + gap + spouseWidth;
-      d.centerX = d.x + gap/2;
+
+      // 🔥 SADECE BURASI DEĞİŞTİ
+      d.centerX = d.x + (d.data.spouse ? gap/2 : 0);
+
     } else {
       d.totalWidth = mainWidth;
       d.centerX = d.x;
@@ -143,7 +145,6 @@ function updateTree(){
     d.realX = d.centerX - d.totalWidth/2;
   });
 
-  // === ORTA HAT (ÇOCUK DAĞILIMI) + ÇOCUĞA İNEN DİKEY ===
   g.selectAll(".link")
     .data(root.links())
     .enter()
@@ -166,8 +167,6 @@ function updateTree(){
   nodes.each(function(d){
 
     const gNode = d3.select(this);
-
-    // === EŞ MESAFESİ ===
     const gap = 20;
 
     gNode.append("rect")
