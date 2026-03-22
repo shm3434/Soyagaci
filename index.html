@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -224,7 +223,7 @@ function updateTree(){
         .attr("height",30)
         .attr("fill","#ffe6e6")
         .on("click",(e)=>{
-          selectedNode = d.data;
+          selectedNode = d.data.spouse;
           selectedType = "spouse";
           openModal(d.data.spouse);
           e.stopPropagation();
@@ -248,7 +247,7 @@ function updateTree(){
 
 }
 
-// 🔥 FIXED PARENT ADD
+// 🔥 SADECE BURASI DEĞİŞTİ
 function addParent(){
 
   function insertParent(node){
@@ -257,7 +256,8 @@ function addParent(){
 
     node.children = node.children.map(c=>{
 
-      if(c.id === selectedNode.id){
+      // ANA KİŞİ
+      if(selectedType === "self" && c.id === selectedNode.id){
 
         return {
           id:createId(),
@@ -267,15 +267,30 @@ function addParent(){
           children:[c]
         };
 
-      } else {
-        insertParent(c);
+      }
+
+      // 🔥 EŞ İÇİN GERÇEK FIX
+      if(selectedType === "spouse" && c.spouse && c.spouse.id === selectedNode.id){
+
+        c.spouse = {
+          id:createId(),
+          name:"Yeni Ebeveyn",
+          note:"",
+          spouse:null,
+          children:[c.spouse]
+        };
+
         return c;
       }
+
+      insertParent(c);
+      return c;
 
     });
   }
 
-  if(data.id === selectedNode.id){
+  if(selectedType === "self" && data.id === selectedNode.id){
+
     data = {
       id:createId(),
       name:"Yeni Ebeveyn",
@@ -283,7 +298,9 @@ function addParent(){
       spouse:null,
       children:[data]
     };
+
   } else {
+
     insertParent(data);
   }
 
@@ -311,8 +328,8 @@ function save(){
     selectedNode.name = name;
     selectedNode.note = note;
   } else {
-    selectedNode.spouse.name = name;
-    selectedNode.spouse.note = note;
+    selectedNode.name = name;
+    selectedNode.note = note;
   }
 
   saveTree();
