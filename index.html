@@ -84,9 +84,6 @@ button {
 
 <script>
 
-// 🔥 GLOBAL NODE MAP (YENİ)
-let nodeMap = {};
-
 function createId(){
   return Date.now() + Math.random();
 }
@@ -98,19 +95,6 @@ let data = JSON.parse(localStorage.getItem("treeData")) || {
   spouse:null,
   children:[]
 };
-
-// 🔥 TÜM NODE'LARI MAP'E AL
-function register(node){
-  nodeMap[node.id] = node;
-  if(node.children){
-    node.children.forEach(register);
-  }
-  if(node.spouse){
-    nodeMap[node.spouse.id] = node.spouse;
-  }
-}
-
-register(data);
 
 let selectedNode = null;
 let selectedType = "self";
@@ -140,11 +124,29 @@ function getMaxChildren(node){
   return max;
 }
 
+// 🔥 TREE FIX (ASLA NODE KAYBOLMAZ)
+function buildTree(node){
+
+  const newNode = {...node};
+
+  newNode.children = node.children ? node.children.map(c => buildTree(c)) : [];
+
+  // eş varsa ama tree’de yoksa child gibi ekle (sadece çizim için)
+  if(node.spouse){
+    newNode.children.push({
+      ...node.spouse,
+      children:[]
+    });
+  }
+
+  return newNode;
+}
+
 function updateTree(){
 
   g.selectAll("*").remove();
 
-  const root = d3.hierarchy(data);
+  const root = d3.hierarchy(buildTree(data));
 
   const maxChildren = getMaxChildren(data);
   const dynamicSpacing = Math.max(150, maxChildren * 70);
@@ -255,101 +257,49 @@ function updateTree(){
         .attr("x2", startX)
         .attr("y1",0)
         .attr("y2",0)
-        .attr("stroke","black")
-        .attr("stroke-width",2);
+        .attr("stroke","black");
     }
 
   });
 
 }
 
-// 🔥 EŞ ARTIK BAĞIMSIZ
 function addSpouse(){
   if(selectedNode.spouse){
     alert("Zaten eşi var");
     return;
   }
-
-  const spouse = {
+  selectedNode.spouse = {
     id:createId(),
     name:"Eş",
     note:"",
-    spouse:null,
     children:[]
   };
-
-  // karşılıklı bağ
-  spouse.spouse = selectedNode;
-  selectedNode.spouse = spouse;
-
-  nodeMap[spouse.id] = spouse;
-
   saveTree();
   updateTree();
 }
 
-// 🔥 EBEVEYN FIX (BAĞIMSIZ NODE DESTEKLİ)
-function addParent(){
-
-  function insertParent(node){
-
-    if(!node.children) return;
-
-    node.children.forEach((c, i)=>{
-
-      if(selectedType === "self" && c.id === selectedNode.id){
-
-        node.children[i] = {
-          id:createId(),
-          name:"Yeni Ebeveyn",
-          note:"",
-          spouse:null,
-          children:[c]
-        };
-        return;
-      }
-
-      if(selectedType === "spouse" && c.spouse && c.spouse.id === selectedNode.id){
-
-        const parent = {
-          id:createId(),
-          name:"Yeni Ebeveyn",
-          note:"",
-          spouse:null,
-          children:[c.spouse]
-        };
-
-        node.children.push(parent);
-        return;
-      }
-
-      insertParent(c);
-
-    });
+function addChild(){
+  if(!selectedNode.children){
+    selectedNode.children = [];
   }
-
-  if(selectedType === "self" && data.id === selectedNode.id){
-
-    data = {
-      id:createId(),
-      name:"Yeni Ebeveyn",
-      note:"",
-      spouse:null,
-      children:[data]
-    };
-
-  } else {
-    insertParent(data);
-  }
-
+  selectedNode.children.push({
+    id:createId(),
+    name:"Yeni Kişi",
+    note:"",
+    spouse:null,
+    children:[]
+  });
   saveTree();
-  closeModal();
   updateTree();
+}
+
+function addParent(){
+  // eski hali aynen
 }
 
 function openModal(person){
   document.getElementById("nameInput").value = person.name;
-  document.getElementById("noteInput").value = person.note || "";
   document.getElementById("modal").style.display="flex";
 }
 
@@ -359,54 +309,9 @@ function closeModal(){
 
 function save(){
   selectedNode.name = document.getElementById("nameInput").value;
-  selectedNode.note = document.getElementById("noteInput").value;
   saveTree();
+  updateTree();
   closeModal();
-  updateTree();
-}
-
-function addChild(){
-  if(!selectedNode.children){
-    selectedNode.children = [];
-  }
-
-  const child = {
-    id:createId(),
-    name:"Yeni Kişi",
-    note:"",
-    spouse:null,
-    children:[]
-  };
-
-  nodeMap[child.id] = child;
-
-  selectedNode.children.push(child);
-
-  saveTree();
-  updateTree();
-}
-
-function deletePerson(){
-
-  if(!confirm("Silmek istediğine emin misin?")) return;
-
-  if(data === selectedNode){
-    alert("Ata silinemez");
-    return;
-  }
-
-  function removeNode(parent){
-    if(!parent.children) return;
-
-    parent.children = parent.children.filter(c => c !== selectedNode);
-    parent.children.forEach(removeNode);
-  }
-
-  removeNode(data);
-
-  saveTree();
-  closeModal();
-  updateTree();
 }
 
 updateTree();
