@@ -2,115 +2,101 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Soyağacı PRO+ (Bağımsız Eş Desteği)</title>
+    <title>Soyağacı PRO+ (Gelişmiş Soy Bağlantısı)</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        body { margin:0; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }
-        svg { width:100vw; height:100vh; background:#f8f9fa; }
-        .node rect { fill:white; stroke:#2c3e50; stroke-width:2px; rx:8; }
-        .node text { font-size:12px; font-weight: bold; text-anchor:middle; fill: #2c3e50; pointer-events: none; }
-        .link { fill:none; stroke:#95a5a6; stroke-width:2px; }
-        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:none; justify-content:center; align-items:center; z-index: 1000; }
-        .modal-content { background:white; padding:25px; border-radius:12px; width:320px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        h3 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        input, textarea { width:100%; margin-top:10px; padding: 8px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
-        button { padding: 10px; cursor: pointer; border: none; border-radius: 4px; transition: 0.2s; font-weight: bold; }
-        .btn-save { background: #27ae60; color: white; grid-column: span 2; }
-        .btn-add { background: #3498db; color: white; }
-        .btn-del { background: #e74c3c; color: white; }
-        .btn-close { background: #95a5a6; color: white; grid-column: span 2; }
-        button:hover { opacity: 0.8; }
+        body { margin:0; font-family: 'Segoe UI', sans-serif; background:#f0f2f5; }
+        svg { width:100vw; height:100vh; }
+        .node rect { fill:white; stroke:#2c3e50; stroke-width:2px; rx:5; }
+        .node text { font-size:12px; text-anchor:middle; font-weight:500; pointer-events:none; }
+        .link { fill:none; stroke:#999; stroke-width:1.5px; }
+        .marriage-link { fill:none; stroke:#e91e63; stroke-width:2px; stroke-dasharray: 5,3; }
+        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; justify-content:center; align-items:center; z-index:99; }
+        .modal-content { background:white; padding:20px; border-radius:10px; width:300px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        button { width:100%; margin-top:8px; padding:8px; cursor:pointer; border-radius:5px; border:none; font-weight:bold; }
+        .btn-add { background:#3498db; color:white; }
+        .btn-save { background:#27ae60; color:white; }
+        .btn-del { background:#e74c3c; color:white; }
+        input, textarea { width:100%; margin-top:5px; padding:5px; box-sizing:border-box; }
     </style>
 </head>
 <body>
 
-<div id="ui" style="position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none;">
-    <h2 style="margin:0;">🌳 Soyağacı PRO+</h2>
-    <small>Kişilere tıklayarak düzenleme yapabilirsiniz</small>
+<div style="position:fixed; top:10px; width:100%; text-align:center; pointer-events:none;">
+    <h2 style="margin:0; color:#2c3e50;">🌳 Soyağacı Sistemi</h2>
+    <p style="margin:0; font-size:12px;">Eşlere ebeveyn ekleyerek her iki soyu da büyütebilirsiniz.</p>
 </div>
 
-<svg></svg>
+<svg id="tree-svg"></svg>
 
 <div class="modal" id="modal">
     <div class="modal-content">
-        <h3 id="modalTitle">Kişi Düzenle</h3>
-        <label>İsim:</label>
-        <input id="nameInput" placeholder="İsim yazınız...">
-        <label>Notlar:</label>
-        <textarea id="noteInput" rows="3"></textarea>
-        
-        <div class="btn-group">
-            <button class="btn-save" onclick="save()">💾 Değişiklikleri Kaydet</button>
-            <button class="btn-add" onclick="addChild()">👶 Çocuk Ekle</button>
-            <button class="btn-add" onclick="addSpouse()">💍 Eş Ekle</button>
-            <button class="btn-add" onclick="addParent()">⬆️ Ebeveyn Ekle</button>
-            <button class="btn-del" onclick="deletePerson()">🗑️ Sil</button>
-            <button class="btn-close" onclick="closeModal()">❌ Kapat</button>
-        </div>
+        <h3 id="m-title" style="margin:0 0 10px 0;">Düzenle</h3>
+        <input id="nameInput" placeholder="İsim">
+        <textarea id="noteInput" placeholder="Notlar" rows="2"></textarea>
+        <button class="btn-save" onclick="save()">Kaydet</button>
+        <button class="btn-add" onclick="addChild()">Çocuk Ekle</button>
+        <button class="btn-add" onclick="addSpouse()">Eş Ekle</button>
+        <button class="btn-add" onclick="addParent()">Ebeveyn Ekle</button>
+        <button class="btn-del" onclick="deletePerson()">Sil</button>
+        <button style="background:#95a5a6; color:white;" onclick="closeModal()">Kapat</button>
     </div>
 </div>
 
 <script>
-// --- VERİ YÖNETİMİ ---
-function createId(){ return "id_" + Date.now() + "_" + Math.floor(Math.random()*1000); }
-
-let data = JSON.parse(localStorage.getItem("treeDataV2")) || {
-    id: createId(),
-    name: "Ata Kişi",
-    note: "",
-    spouse: null,
+let treeData = JSON.parse(localStorage.getItem("proTree")) || {
+    id: "root",
+    name: "Ata",
     children: []
 };
 
-let selectedNode = null; 
-let selectedType = "self"; // "self" veya "spouse"
+let selectedNode = null;
+let selectedType = "self";
 
-const svg = d3.select("svg");
+const svg = d3.select("#tree-svg");
 const g = svg.append("g");
 
-svg.call(d3.zoom().on("zoom", (e) => { g.attr("transform", e.transform); }));
+svg.call(d3.zoom().on("zoom", (e) => g.attr("transform", e.transform)));
 
-function saveTree(){ localStorage.setItem("treeDataV2", JSON.stringify(data)); }
+function saveTree() { localStorage.setItem("proTree", JSON.stringify(treeData)); }
 
-// --- ÇİZİM MOTORU ---
-function getTextWidth(text){ return (text ? text.length : 5) * 8 + 30; }
-
-function updateTree() {
+function update() {
     g.selectAll("*").remove();
-    const root = d3.hierarchy(data);
-    const treeLayout = d3.tree().nodeSize([220, 180]);
+
+    // Hiyerarşiyi oluştur
+    const root = d3.hierarchy(treeData);
+    const treeLayout = d3.tree().nodeSize([180, 150]);
     treeLayout(root);
 
-    // Bağlantıları Çiz (Linkler)
+    // Eşler ve Bağlantılar İçin Koordinat Haritası
+    const nodes = root.descendants();
+    const marriageLinks = [];
+
+    // Normal Linkler (Ebeveyn-Çocuk)
     g.selectAll(".link")
         .data(root.links())
         .enter()
         .append("path")
         .attr("class", "link")
-        .attr("d", d => {
-            const startX = d.source.x + (d.source.data.spouse ? 40 : 0);
-            return `M${startX},${d.source.y} V${(d.source.y + d.target.y)/2} H${d.target.x} V${d.target.y}`;
-        });
+        .attr("d", d => `M${d.source.x},${d.source.y}V${(d.source.y+d.target.y)/2}H${d.target.x}V${d.target.y}`);
 
-    // Düğümleri Çiz (Nodes)
-    const nodes = g.selectAll(".node")
-        .data(root.descendants())
+    // Düğümleri Çiz
+    const nodeEnter = g.selectAll(".node")
+        .data(nodes)
         .enter()
         .append("g")
         .attr("class", "node")
         .attr("transform", d => `translate(${d.x},${d.y})`);
 
-    nodes.each(function(d) {
-        const nodeGroup = d3.select(this);
-        const nameWidth = getTextWidth(d.data.name);
+    nodeEnter.each(function(d) {
+        const el = d3.select(this);
+        const isSpouseNode = d.data.isSpouseBranch; // Bu bir eş soyu dalı mı?
 
-        // Ana Kişi Kutusu
-        nodeGroup.append("rect")
-            .attr("x", -nameWidth/2)
-            .attr("y", -18)
-            .attr("width", nameWidth)
-            .attr("height", 36)
+        // Ana kutu
+        el.append("rect")
+            .attr("x", -60).attr("y", -15).attr("width", 120).attr("height", 30)
+            .attr("fill", isSpouseNode ? "#fff0f5" : "white")
+            .attr("stroke", isSpouseNode ? "#e91e63" : "#2c3e50")
             .on("click", (e) => {
                 selectedNode = d.data;
                 selectedType = "self";
@@ -118,47 +104,34 @@ function updateTree() {
                 e.stopPropagation();
             });
 
-        nodeGroup.append("text")
-            .attr("dy", 5)
-            .text(d.data.name);
+        el.append("text").attr("dy", 5).text(d.data.name);
 
-        // Eş Kutusu (Varsa)
+        // Eğer bu düğümün bir eşi varsa (Klasik görünüm)
         if (d.data.spouse) {
-            const spWidth = getTextWidth(d.data.spouse.name);
-            const spX = nameWidth/2 + 30;
-
-            // Bağlantı çizgisi
-            nodeGroup.append("line")
-                .attr("x1", nameWidth/2).attr("y1", 0)
-                .attr("x2", spX).attr("y2", 0)
-                .attr("stroke", "#e91e63").attr("stroke-width", 2).attr("stroke-dasharray", "4,2");
-
-            nodeGroup.append("rect")
-                .attr("x", spX)
-                .attr("y", -18)
-                .attr("width", spWidth)
-                .attr("height", 36)
-                .attr("fill", "#fff0f5")
-                .attr("stroke", "#e91e63")
+            const spX = 100;
+            // Eş kutusu
+            el.append("rect")
+                .attr("x", spX).attr("y", -15).attr("width", 100).attr("height", 30)
+                .attr("fill", "#fff0f5").attr("stroke", "#e91e63")
                 .on("click", (e) => {
                     selectedNode = d.data.spouse;
+                    selectedNode._parentRef = d.data; // Bağlantı için referans
                     selectedType = "spouse";
                     openModal(d.data.spouse);
                     e.stopPropagation();
                 });
 
-            nodeGroup.append("text")
-                .attr("x", spX + spWidth/2)
-                .attr("dy", 5)
-                .text(d.data.spouse.name);
+            el.append("text").attr("x", spX + 50).attr("dy", 5).text(d.data.spouse.name);
+
+            // Evlilik çizgisi
+            el.append("line")
+                .attr("class", "marriage-link")
+                .attr("x1", 60).attr("y1", 0).attr("x2", spX).attr("y2", 0);
         }
     });
 }
 
-// --- AKSİYONLAR ---
-
 function openModal(person) {
-    document.getElementById("modalTitle").innerText = person.name;
     document.getElementById("nameInput").value = person.name;
     document.getElementById("noteInput").value = person.note || "";
     document.getElementById("modal").style.display = "flex";
@@ -169,94 +142,81 @@ function closeModal() { document.getElementById("modal").style.display = "none";
 function save() {
     selectedNode.name = document.getElementById("nameInput").value;
     selectedNode.note = document.getElementById("noteInput").value;
-    saveTree(); closeModal(); updateTree();
+    saveTree(); closeModal(); update();
 }
 
 function addChild() {
-    if (selectedType === "spouse") {
-        alert("Çocukları lütfen ana kişi üzerinden ekleyiniz.");
-        return;
-    }
     if (!selectedNode.children) selectedNode.children = [];
-    selectedNode.children.push({ id: createId(), name: "Yeni Çocuk", note: "", spouse: null, children: [] });
-    saveTree(); updateTree();
+    selectedNode.children.push({ id: Date.now(), name: "Yeni Çocuk", children: [] });
+    saveTree(); update();
 }
 
 function addSpouse() {
-    if (selectedType === "spouse" || selectedNode.spouse) {
-        alert("Zaten bir eş tanımlı.");
-        return;
-    }
-    selectedNode.spouse = { id: createId(), name: "Eş", note: "" };
-    saveTree(); updateTree();
+    if (selectedNode.spouse) return alert("Eş zaten var");
+    selectedNode.spouse = { id: Date.now(), name: "Eş", note: "" };
+    saveTree(); update();
 }
 
-// 🔥 DÜZELTİLMİŞ EBEVEYN EKLEME (Eş Desteği Dahil)
+// 🔥 KRİTİK DÜZELTME: Ebeveyn Ekleme
 function addParent() {
-    function findAndReplace(current) {
-        if (!current.children) return false;
-
-        for (let i = 0; i < current.children.length; i++) {
-            let child = current.children[i];
-
-            // 1. Durum: Ana kişi seçiliyse
-            if (selectedType === "self" && child.id === selectedNode.id) {
-                const newParent = { id: createId(), name: "Yeni Ebeveyn", children: [child] };
-                current.children[i] = newParent;
-                return true;
-            }
-
-            // 2. Durum: Eş seçiliyse (Eşi bağımsız bir dala taşır)
-            if (selectedType === "spouse" && child.spouse && child.spouse.id === selectedNode.id) {
-                const spouseData = child.spouse;
-                child.spouse = null; // Eski yerinden eşi sil
-                const newParent = { id: createId(), name: "Eşin Ebeveyni", children: [spouseData] };
-                current.children.push(newParent); // Aynı seviyeye yeni bir dal olarak ekle
-                return true;
-            }
-
-            if (findAndReplace(child)) return true;
+    if (selectedType === "spouse") {
+        // EŞE EBEVEYN EKLEME: 
+        // Eşi olduğu yerden silmiyoruz. Sadece ağacın en üstüne eşin soyunu yeni bir dal olarak ekliyoruz.
+        const spouseData = selectedNode;
+        const newBranch = {
+            id: Date.now(),
+            name: spouseData.name + " Soyu (Ebeveyn)",
+            isSpouseBranch: true,
+            children: [ { ...spouseData, isSpouseBranch: true } ] 
+        };
+        
+        // Eşi bir "soy dalı" olarak en tepeye (root seviyesine) kardeş olarak ekle
+        // Not: Gerçek bir soy ağacında çoklu root olamayacağı için geçici bir üst düğüm oluşturulur
+        if(!treeData.isWrapper) {
+            treeData = {
+                name: "Aileler",
+                isWrapper: true,
+                children: [treeData, newBranch]
+            };
+        } else {
+            treeData.children.push(newBranch);
         }
-        return false;
-    }
-
-    // Kök (Ata) kontrolü
-    if (data.id === selectedNode.id && selectedType === "self") {
-        data = { id: createId(), name: "Yeni Üst Soy", children: [data] };
-    } else if (selectedType === "spouse" && data.spouse && data.spouse.id === selectedNode.id) {
-        // Eğer kökün eşine ebeveyn ekleniyorsa
-        const spouseData = data.spouse;
-        data.spouse = null;
-        const oldData = data;
-        data = { id: createId(), name: "Aile Kökü", children: [oldData, { id: createId(), name: "Eş Soyu", children: [spouseData] }] };
     } else {
-        findAndReplace(data);
-    }
+        // KENDİNE EBEVEYN EKLEME (Normal akış)
+        const findAndReplace = (node) => {
+            if (node.children) {
+                for (let i = 0; i < node.children.length; i++) {
+                    if (node.children[i].id === selectedNode.id) {
+                        const oldChild = node.children[i];
+                        node.children[i] = { id: Date.now(), name: "Ebeveyn", children: [oldChild] };
+                        return true;
+                    }
+                    if (findAndReplace(node.children[i])) return true;
+                }
+            }
+            return false;
+        };
 
-    saveTree(); closeModal(); updateTree();
+        if (treeData.id === selectedNode.id) {
+            treeData = { id: Date.now(), name: "Ebeveyn", children: [treeData] };
+        } else {
+            findAndReplace(treeData);
+        }
+    }
+    saveTree(); closeModal(); update();
 }
 
 function deletePerson() {
-    if (data.id === selectedNode.id) { alert("Ana kök silinemez."); return; }
-    if (!confirm("Bu kişiyi ve alt soyunu silmek istediğinize emin misiniz?")) return;
-
-    function removeRecursive(parent) {
-        if (!parent.children) return;
-        parent.children = parent.children.filter(c => {
-            if (c.id === selectedNode.id) return false;
-            if (c.spouse && c.spouse.id === selectedNode.id) { c.spouse = null; return true; }
-            return true;
-        });
-        parent.children.forEach(removeRecursive);
-    }
-
-    removeRecursive(data);
-    saveTree(); closeModal(); updateTree();
+    const remove = (node) => {
+        if (!node.children) return;
+        node.children = node.children.filter(c => c.id !== selectedNode.id);
+        node.children.forEach(remove);
+    };
+    remove(treeData);
+    saveTree(); closeModal(); update();
 }
 
-// Başlat
-updateTree();
+update();
 </script>
-
 </body>
 </html>
