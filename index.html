@@ -123,7 +123,8 @@ function updateTree(){
 
   root.descendants().forEach(d=>{
 
-    const gap = 20;
+    // 🔥 SADECE BURASI DEĞİŞTİ
+    const gap = 60;
 
     const mainWidth = getTextWidth(d.data.name);
     const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
@@ -139,7 +140,6 @@ function updateTree(){
 
     d.realX = d.x - d.totalWidth/2;
 
-    // 🔥 TEK DÜZELTME BURADA
     if(d.data.spouse){
       d.linkX = d.realX + d.mainWidth + (gap / 2);
     } else {
@@ -170,7 +170,7 @@ function updateTree(){
   nodes.each(function(d){
 
     const gNode = d3.select(this);
-    const gap = 20;
+    const gap = 60;
 
     gNode.append("rect")
       .attr("x",0)
