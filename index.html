@@ -98,11 +98,11 @@ let data = JSON.parse(localStorage.getItem("treeData")) || {
 
 let selectedNode = null;
 
-function findNodeById(node,id){
-  if(node.id===id) return node;
+function findNode(node,id){
+  if(node.id === id) return node;
   if(node.children){
     for(let c of node.children){
-      let f = findNodeById(c,id);
+      let f = findNode(c,id);
       if(f) return f;
     }
   }
@@ -174,7 +174,7 @@ function updateTree(){
 
     // 🔥 eş çizgisi
     if(node.spouseId){
-      const spouse = findNodeById(data,node.spouseId);
+      const spouse = findNode(data,node.spouseId);
       if(spouse){
         g.append("line")
           .attr("x1",d.x)
@@ -192,6 +192,7 @@ function updateTree(){
 
 function openModal(person){
   document.getElementById("nameInput").value = person.name;
+  document.getElementById("noteInput").value = person.note || "";
   document.getElementById("modal").style.display="flex";
 }
 
@@ -201,6 +202,7 @@ function closeModal(){
 
 function save(){
   selectedNode.name = document.getElementById("nameInput").value;
+  selectedNode.note = document.getElementById("noteInput").value;
   saveTree();
   updateTree();
   closeModal();
@@ -235,7 +237,6 @@ function addSpouse(){
 
   selectedNode.spouseId = spouse.id;
 
-  // aynı seviyeye ekle
   function insert(node){
     if(node.children){
       node.children.push(spouse);
@@ -282,7 +283,26 @@ function addParent(){
   closeModal();
 }
 
-function deletePerson(){}
+function deletePerson(){
+
+  function remove(node,parent){
+    if(!node.children) return;
+
+    node.children = node.children.filter(c=>c.id!==selectedNode.id);
+    node.children.forEach(c=>remove(c,node));
+  }
+
+  if(data.id === selectedNode.id){
+    alert("Ata silinemez");
+    return;
+  }
+
+  remove(data,null);
+
+  saveTree();
+  updateTree();
+  closeModal();
+}
 
 updateTree();
 
