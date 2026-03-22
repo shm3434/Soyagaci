@@ -82,7 +82,7 @@ button {
 
 <script>
 
-// 🔥 GLOBAL NODE MAP (bağımsız node sistemi)
+// 🔥 TÜM NODE'LAR
 let nodes = {};
 
 function createId(){
@@ -101,8 +101,8 @@ function createNode(name){
   return nodes[id];
 }
 
-// ROOT
-let data = createNode("Ata");
+// root
+let root = createNode("Ata");
 
 let selectedNode = null;
 let selectedType = "self";
@@ -118,12 +118,12 @@ function getTextWidth(text){
   return text.length * 7 + 20;
 }
 
-// 🔥 TREE BUILDER (senin görünümü koruyor)
-function buildTree(node){
+// 🔥 DOĞRU TREE BUILDER
+function buildHierarchy(node){
 
   return {
     ...node,
-    children: node.children.map(id => buildTree(nodes[id]))
+    children: node.children.map(id => buildHierarchy(nodes[id]))
   };
 }
 
@@ -131,14 +131,14 @@ function updateTree(){
 
   g.selectAll("*").remove();
 
-  const root = d3.hierarchy(buildTree(data));
+  const rootData = d3.hierarchy(buildHierarchy(root));
 
   const treeLayout = d3.tree().nodeSize([150,200]);
-  treeLayout(root);
+  treeLayout(rootData);
 
-  // linkler
+  // çizgiler
   g.selectAll(".link")
-    .data(root.links())
+    .data(rootData.links())
     .enter()
     .append("path")
     .attr("class","link")
@@ -150,7 +150,7 @@ function updateTree(){
     `);
 
   const nodesDraw = g.selectAll(".node")
-    .data(root.descendants())
+    .data(rootData.descendants())
     .enter()
     .append("g")
     .attr("class","node")
@@ -181,7 +181,7 @@ function updateTree(){
       .attr("dy",4)
       .text(node.name);
 
-    // 🔥 EŞ ÇİZİMİ (ama bağımsız node)
+    // 🔥 EŞ (BAĞIMSIZ AMA YAN YANA)
     if(node.spouseId){
 
       const spouse = nodes[node.spouseId];
@@ -236,16 +236,15 @@ function save(){
   closeModal();
 }
 
-// 🔥 ÇOCUK
+// çocuk
 function addChild(){
   const child = createNode("Yeni Kişi");
   selectedNode.children.push(child.id);
   updateTree();
 }
 
-// 🔥 EŞ (GERÇEK NODE)
+// eş
 function addSpouse(){
-
   if(selectedNode.spouseId){
     alert("Zaten eşi var");
     return;
@@ -259,14 +258,14 @@ function addSpouse(){
   updateTree();
 }
 
-// 🔥 EBEVEYN (ARTIK %100 DOĞRU)
+// ebeveyn
 function addParent(){
 
   const parent = createNode("Yeni Ebeveyn");
   parent.children.push(selectedNode.id);
 
-  if(data.id === selectedNode.id){
-    data = parent;
+  if(root.id === selectedNode.id){
+    root = parent;
   } else {
 
     function replace(node){
@@ -279,7 +278,7 @@ function addParent(){
       });
     }
 
-    replace(data);
+    replace(root);
   }
 
   updateTree();
