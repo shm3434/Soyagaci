@@ -123,7 +123,6 @@ function updateTree(){
 
   root.descendants().forEach(d=>{
 
-    // 🔥 SADECE BURASI DEĞİŞTİ
     const gap = 60;
 
     const mainWidth = getTextWidth(d.data.name);
@@ -140,11 +139,8 @@ function updateTree(){
 
     d.realX = d.x - d.totalWidth/2;
 
-    if(d.data.spouse){
-      d.linkX = d.realX + d.mainWidth + (gap / 2);
-    } else {
-      d.linkX = d.realX + (d.mainWidth / 2);
-    }
+    // 🔥 ARTIK HER ZAMAN ANA KİŞİ ORTASI
+    d.linkX = d.realX + (d.mainWidth / 2);
 
   });
 
