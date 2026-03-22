@@ -66,7 +66,6 @@ button {
 <body>
 
 <h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
-
 <svg></svg>
 
 <div class="modal" id="modal">
@@ -77,7 +76,6 @@ button {
     <button onclick="addChild()">Çocuk Ekle</button>
     <button onclick="addSpouse()">Eş Ekle</button>
     <button onclick="addParent()">Ebeveyn Ekle</button>
-    <button onclick="deletePerson()">Sil</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
@@ -88,7 +86,7 @@ function createId(){
   return Date.now() + Math.random();
 }
 
-// 🔥 TÜM KİŞİLER BURADA (gerçek node sistemi)
+// 🔥 TÜM NODE'LAR
 let people = {};
 
 function createPerson(name){
@@ -103,7 +101,6 @@ function createPerson(name){
   return people[id];
 }
 
-// root
 let root = createPerson("Ata");
 
 let selectedNode = null;
@@ -115,10 +112,35 @@ svg.call(d3.zoom().on("zoom", (e)=>{
   g.attr("transform", e.transform);
 }));
 
-function buildTree(node){
+// 🔥 AĞAÇ OLUŞTURMA (eşleri de dahil ediyor)
+function buildTree(node, visited = new Set()){
+
+  if(visited.has(node.id)) return null;
+  visited.add(node.id);
+
+  let children = [];
+
+  // normal çocuklar
+  node.children.forEach(id=>{
+    const child = buildTree(people[id], visited);
+    if(child) children.push(child);
+  });
+
+  // eşi de aynı seviyeye ekle
+  if(node.spouseId){
+    const spouse = people[node.spouseId];
+    if(spouse && !visited.has(spouse.id)){
+      visited.add(spouse.id);
+      children.push({
+        ...spouse,
+        children:[]
+      });
+    }
+  }
+
   return {
     ...node,
-    children: node.children.map(id => buildTree(people[id]))
+    children
   };
 }
 
@@ -130,14 +152,14 @@ function updateTree(){
 
   g.selectAll("*").remove();
 
-  const rootData = d3.hierarchy(buildTree(root));
+  const treeData = d3.hierarchy(buildTree(root));
 
   const treeLayout = d3.tree().nodeSize([180,200]);
-  treeLayout(rootData);
+  treeLayout(treeData);
 
-  // bağlantılar
+  // çizgiler
   g.selectAll(".link")
-    .data(rootData.links())
+    .data(treeData.links())
     .enter()
     .append("path")
     .attr("class","link")
@@ -150,7 +172,7 @@ function updateTree(){
 
   // node
   const nodes = g.selectAll(".node")
-    .data(rootData.descendants())
+    .data(treeData.descendants())
     .enter()
     .append("g")
     .attr("class","node")
@@ -163,7 +185,6 @@ function updateTree(){
 
     const width = getTextWidth(node.name);
 
-    // kişi
     gNode.append("rect")
       .attr("x",-width/2)
       .attr("y",-15)
@@ -178,42 +199,6 @@ function updateTree(){
     gNode.append("text")
       .attr("dy",4)
       .text(node.name);
-
-    // 🔥 eş çizimi (gerçek node ama yanına çiziyoruz)
-    if(node.spouseId){
-      const spouse = people[node.spouseId];
-      if(spouse){
-
-        const spouseWidth = getTextWidth(spouse.name);
-
-        // eş kutusu
-        gNode.append("rect")
-          .attr("x",width/2 + 20)
-          .attr("y",-15)
-          .attr("width",spouseWidth)
-          .attr("height",30)
-          .attr("fill","#ffe6e6")
-          .on("click",(e)=>{
-            selectedNode = spouse;
-            openModal(spouse);
-            e.stopPropagation();
-          });
-
-        gNode.append("text")
-          .attr("x",width/2 + 20 + spouseWidth/2)
-          .attr("dy",4)
-          .text(spouse.name);
-
-        // eş çizgisi
-        gNode.append("line")
-          .attr("x1", width/2)
-          .attr("x2", width/2 + 20)
-          .attr("y1",0)
-          .attr("y2",0)
-          .attr("stroke","black")
-          .attr("stroke-width",2);
-      }
-    }
 
   });
 
@@ -236,14 +221,12 @@ function save(){
   closeModal();
 }
 
-// çocuk ekleme
 function addChild(){
   const child = createPerson("Yeni Kişi");
   selectedNode.children.push(child.id);
   updateTree();
 }
 
-// 🔥 EŞ ARTIK GERÇEK NODE
 function addSpouse(){
 
   if(selectedNode.spouseId){
@@ -259,11 +242,9 @@ function addSpouse(){
   updateTree();
 }
 
-// ebeveyn ekleme (tam doğru)
 function addParent(){
 
   const parent = createPerson("Yeni Ebeveyn");
-
   parent.children.push(selectedNode.id);
 
   if(root.id === selectedNode.id){
@@ -286,8 +267,6 @@ function addParent(){
   updateTree();
   closeModal();
 }
-
-function deletePerson(){}
 
 updateTree();
 
