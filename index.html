@@ -71,7 +71,6 @@ function updateTree(){
   const treeLayout = d3.tree().nodeSize([150,200]);
   treeLayout(root);
 
-  // 🔥 GERÇEK ORTA HESABI
   root.descendants().forEach(d=>{
 
     const gap = 20;
@@ -84,29 +83,28 @@ function updateTree(){
 
     if(d.data.spouse){
       d.totalWidth = mainWidth + gap + spouseWidth;
-
-      // 🔥 GERÇEK ORTA = İKİ KUTUNUN ORTASI
-      d.trueCenter = d.x + gap/2;
-
+      d.centerX = d.x + gap/2;
     } else {
       d.totalWidth = mainWidth;
-      d.trueCenter = d.x;
+      d.centerX = d.x;
     }
 
-    d.realX = d.trueCenter - d.totalWidth/2;
+    d.realX = d.centerX - d.totalWidth/2;
+
+    // 🔥 SADECE BURASI EKLENDİ (çıkış düzeltme)
+    d.linkX = d.data.spouse ? d.centerX : d.centerX;
 
   });
 
-  // 🔥 ARTIK BURASI KULLANILIYOR
   g.selectAll(".link")
     .data(root.links())
     .enter()
     .append("path")
     .attr("class","link")
     .attr("d", d=>`
-      M${d.source.trueCenter},${d.source.y}
+      M${d.source.linkX},${d.source.y}
       V${(d.source.y + d.target.y)/2}
-      H${d.target.trueCenter}
+      H${d.target.linkX}
       V${d.target.y}
     `);
 
@@ -114,6 +112,7 @@ function updateTree(){
     .data(root.descendants())
     .enter()
     .append("g")
+    .attr("class","node")
     .attr("transform", d=>`translate(${d.realX},${d.y})`);
 
   nodes.each(function(d){
@@ -152,18 +151,4 @@ function updateTree(){
         .attr("x1", d.mainWidth)
         .attr("x2", startX)
         .attr("y1",0)
-        .attr("y2",0)
-        .attr("stroke","black")
-        .attr("stroke-width",2);
-    }
-
-  });
-
-}
-
-updateTree();
-
-</script>
-
-</body>
-</html>
+        .attr("y2",
