@@ -113,7 +113,6 @@ function getTextWidth(text){
   return text.length * 7 + 20;
 }
 
-// 🔥 YENİ: EN ALTTAKİ MAX KARDEŞ SAYISI
 function getMaxChildren(node){
   let max = node.children ? node.children.length : 0;
   if(node.children){
@@ -130,12 +129,20 @@ function updateTree(){
 
   const root = d3.hierarchy(data);
 
-  // 🔥 AKILLI SPACING
   const maxChildren = getMaxChildren(data);
   const dynamicSpacing = Math.max(150, maxChildren * 70);
 
   const treeLayout = d3.tree().nodeSize([dynamicSpacing,200]);
   treeLayout(root);
+
+  // 🔥 AİLE HİZALAMA (ANA EKLEME)
+  root.descendants().forEach(d=>{
+    if(d.children && d.children.length){
+      const avg =
+        d3.mean(d.children, c => c.x);
+      d.x = avg;
+    }
+  });
 
   root.descendants().forEach(d=>{
 
