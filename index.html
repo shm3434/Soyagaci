@@ -247,7 +247,7 @@ function updateTree(){
 
 }
 
-// 🔥 SADECE BURASI DEĞİŞTİ
+// 🔥 SADECE BURASI DÜZELTİLDİ
 function addParent(){
 
   function insertParent(node){
@@ -256,7 +256,6 @@ function addParent(){
 
     node.children = node.children.map(c=>{
 
-      // ANA KİŞİ
       if(selectedType === "self" && c.id === selectedNode.id){
 
         return {
@@ -269,18 +268,19 @@ function addParent(){
 
       }
 
-      // 🔥 EŞ İÇİN GERÇEK FIX
       if(selectedType === "spouse" && c.spouse && c.spouse.id === selectedNode.id){
 
-        c.spouse = {
+        return {
           id:createId(),
           name:"Yeni Ebeveyn",
           note:"",
           spouse:null,
-          children:[c.spouse]
+          children:[{
+            ...c,
+            spouse: c.spouse
+          }]
         };
 
-        return c;
       }
 
       insertParent(c);
@@ -324,13 +324,8 @@ function save(){
   const name = document.getElementById("nameInput").value;
   const note = document.getElementById("noteInput").value;
 
-  if(selectedType === "self"){
-    selectedNode.name = name;
-    selectedNode.note = note;
-  } else {
-    selectedNode.name = name;
-    selectedNode.note = note;
-  }
+  selectedNode.name = name;
+  selectedNode.note = note;
 
   saveTree();
   closeModal();
