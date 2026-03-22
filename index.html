@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -247,35 +248,43 @@ function updateTree(){
 
 }
 
-// 🔥 EBEVEYN EKLE (SADECE BU EKLENDİ)
+// 🔥 FIXED PARENT ADD
 function addParent(){
 
-  const newParent = {
-    id:createId(),
-    name:"Yeni Ebeveyn",
-    note:"",
-    spouse:null,
-    children:[selectedNode]
-  };
+  function insertParent(node){
 
-  if(data === selectedNode){
-    data = newParent;
-  } else {
+    if(!node.children) return;
 
-    function replace(parent){
-      if(!parent.children) return;
+    node.children = node.children.map(c=>{
 
-      parent.children = parent.children.map(c=>{
-        if(c === selectedNode){
-          return newParent;
-        }
+      if(c.id === selectedNode.id){
+
+        return {
+          id:createId(),
+          name:"Yeni Ebeveyn",
+          note:"",
+          spouse:null,
+          children:[c]
+        };
+
+      } else {
+        insertParent(c);
         return c;
-      });
+      }
 
-      parent.children.forEach(replace);
-    }
+    });
+  }
 
-    replace(data);
+  if(data.id === selectedNode.id){
+    data = {
+      id:createId(),
+      name:"Yeni Ebeveyn",
+      note:"",
+      spouse:null,
+      children:[data]
+    };
+  } else {
+    insertParent(data);
   }
 
   saveTree();
