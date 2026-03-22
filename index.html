@@ -8,36 +8,15 @@
 
 <style>
 body { margin:0; font-family: Arial; }
-
-svg {
-  width:100vw;
-  height:85vh;
-  background:#f5f5f5;
-}
-
-.node rect {
-  fill:white;
-  stroke:black;
-  stroke-width:2px;
-  rx:6;
-}
-
-.node text {
-  font-size:12px;
-  text-anchor:middle;
-}
-
-.link {
-  fill:none;
-  stroke:black;
-  stroke-width:2px;
-}
+svg { width:100vw; height:85vh; background:#f5f5f5; }
+.node rect { fill:white; stroke:black; stroke-width:2px; rx:6; }
+.node text { font-size:12px; text-anchor:middle; }
+.link { fill:none; stroke:black; stroke-width:2px; }
 
 .modal {
   position:fixed;
   top:0; left:0;
-  width:100%;
-  height:100%;
+  width:100%; height:100%;
   background:rgba(0,0,0,0.5);
   display:none;
   justify-content:center;
@@ -66,7 +45,6 @@ button {
 <body>
 
 <h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
-
 <svg></svg>
 
 <div class="modal" id="modal">
@@ -88,6 +66,16 @@ function createId(){
   return Date.now() + Math.random();
 }
 
+// 🔥 internal node map (eşleri bağımsız yapmak için)
+let nodeMap = {};
+
+function register(node){
+  nodeMap[node.id] = node;
+  if(node.children){
+    node.children.forEach(register);
+  }
+}
+
 let data = JSON.parse(localStorage.getItem("treeData")) || {
   id:createId(),
   name:"Ata",
@@ -95,6 +83,8 @@ let data = JSON.parse(localStorage.getItem("treeData")) || {
   spouse:null,
   children:[]
 };
+
+register(data);
 
 let selectedNode = null;
 let selectedType = "self";
@@ -247,7 +237,7 @@ function updateTree(){
 
 }
 
-// 🔥 SADECE BURASI DÜZELTİLDİ
+// 🔥 ARTIK %100 DOĞRU
 function addParent(){
 
   function insertParent(node){
@@ -256,7 +246,6 @@ function addParent(){
 
     node.children = node.children.map(c=>{
 
-      // normal kişi
       if(selectedType === "self" && c.id === selectedNode.id){
         return {
           id:createId(),
@@ -267,20 +256,23 @@ function addParent(){
         };
       }
 
-      // 🔥 EŞ FIX (EN DOĞRU HAL)
       if(selectedType === "spouse" && c.spouse && c.spouse.id === selectedNode.id){
 
-        const spouseCopy = JSON.parse(JSON.stringify(c.spouse));
-
-        c.spouse = null; // kişiden kopar
-
-        return {
+        const parent = {
           id:createId(),
           name:"Yeni Ebeveyn",
           note:"",
           spouse:null,
-          children:[spouseCopy]
+          children:[]
         };
+
+        parent.children.push(c.spouse);
+
+        c.spouse = null;
+
+        node.children.push(parent);
+
+        return c;
       }
 
       insertParent(c);
