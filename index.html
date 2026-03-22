@@ -76,6 +76,7 @@ button {
     <button onclick="save()">Kaydet</button>
     <button onclick="addChild()">Çocuk Ekle</button>
     <button onclick="addSpouse()">Eş Ekle</button>
+    <button onclick="addParent()">Ebeveyn Ekle</button>
     <button onclick="deletePerson()">Sil</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
@@ -194,7 +195,6 @@ function updateTree(){
     const gNode = d3.select(this);
     const gap = 60;
 
-    // ANA KİŞİ
     gNode.append("rect")
       .attr("x",0)
       .attr("y",-15)
@@ -212,7 +212,6 @@ function updateTree(){
       .attr("dy",4)
       .text(d.data.name);
 
-    // 🔥 EŞ (CLICK EKLENDİ)
     if(d.data.spouse){
 
       const startX = d.mainWidth + gap;
@@ -246,6 +245,42 @@ function updateTree(){
 
   });
 
+}
+
+// 🔥 EBEVEYN EKLE (SADECE BU EKLENDİ)
+function addParent(){
+
+  const newParent = {
+    id:createId(),
+    name:"Yeni Ebeveyn",
+    note:"",
+    spouse:null,
+    children:[selectedNode]
+  };
+
+  if(data === selectedNode){
+    data = newParent;
+  } else {
+
+    function replace(parent){
+      if(!parent.children) return;
+
+      parent.children = parent.children.map(c=>{
+        if(c === selectedNode){
+          return newParent;
+        }
+        return c;
+      });
+
+      parent.children.forEach(replace);
+    }
+
+    replace(data);
+  }
+
+  saveTree();
+  closeModal();
+  updateTree();
 }
 
 function openModal(person){
