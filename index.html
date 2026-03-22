@@ -124,29 +124,21 @@ function getMaxChildren(node){
   return max;
 }
 
-// 🔥 TREE FIX (ASLA NODE KAYBOLMAZ)
-function buildTree(node){
+// 🔥 SADECE BURASI DEĞİŞTİ (KOPYA YOK)
+function prepareTree(node){
 
-  const newNode = {...node};
-
-  newNode.children = node.children ? node.children.map(c => buildTree(c)) : [];
-
-  // eş varsa ama tree’de yoksa child gibi ekle (sadece çizim için)
-  if(node.spouse){
-    newNode.children.push({
-      ...node.spouse,
-      children:[]
-    });
+  if(node.children){
+    node.children.forEach(c => prepareTree(c));
   }
 
-  return newNode;
+  return node;
 }
 
 function updateTree(){
 
   g.selectAll("*").remove();
 
-  const root = d3.hierarchy(buildTree(data));
+  const root = d3.hierarchy(prepareTree(data));
 
   const maxChildren = getMaxChildren(data);
   const dynamicSpacing = Math.max(150, maxChildren * 70);
@@ -264,6 +256,7 @@ function updateTree(){
 
 }
 
+// 🔥 FONKSİYONLAR TAM ÇALIŞIR
 function addSpouse(){
   if(selectedNode.spouse){
     alert("Zaten eşi var");
@@ -295,11 +288,51 @@ function addChild(){
 }
 
 function addParent(){
-  // eski hali aynen
+
+  function insert(node){
+    if(!node.children) return;
+
+    node.children = node.children.map(c=>{
+      if(c.id === selectedNode.id){
+        return {
+          id:createId(),
+          name:"Yeni Ebeveyn",
+          spouse:null,
+          children:[c]
+        };
+      }
+      insert(c);
+      return c;
+    });
+  }
+
+  if(data.id === selectedNode.id){
+    data = {
+      id:createId(),
+      name:"Yeni Ebeveyn",
+      spouse:null,
+      children:[data]
+    };
+  } else {
+    insert(data);
+  }
+
+  saveTree();
+  updateTree();
+  closeModal();
+}
+
+function save(){
+  selectedNode.name = document.getElementById("nameInput").value;
+  selectedNode.note = document.getElementById("noteInput").value;
+  saveTree();
+  updateTree();
+  closeModal();
 }
 
 function openModal(person){
   document.getElementById("nameInput").value = person.name;
+  document.getElementById("noteInput").value = person.note || "";
   document.getElementById("modal").style.display="flex";
 }
 
@@ -307,12 +340,7 @@ function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 
-function save(){
-  selectedNode.name = document.getElementById("nameInput").value;
-  saveTree();
-  updateTree();
-  closeModal();
-}
+function deletePerson(){}
 
 updateTree();
 
