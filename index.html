@@ -32,12 +32,54 @@ svg {
   stroke:black;
   stroke-width:2px;
 }
+
+.modal {
+  position:fixed;
+  top:0; left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.5);
+  display:none;
+  justify-content:center;
+  align-items:center;
+}
+
+.modal-content {
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  width:300px;
+}
+
+input, textarea {
+  width:100%;
+  margin-top:10px;
+}
+
+button {
+  margin-top:10px;
+  width:100%;
+}
 </style>
 </head>
 
 <body>
 
+<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
+
 <svg></svg>
+
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <input id="nameInput">
+    <textarea id="noteInput"></textarea>
+    <button onclick="save()">Kaydet</button>
+    <button onclick="addChild()">Çocuk Ekle</button>
+    <button onclick="addSpouse()">Eş Ekle</button>
+    <button onclick="deletePerson()">Sil</button>
+    <button onclick="closeModal()">Kapat</button>
+  </div>
+</div>
 
 <script>
 
@@ -45,12 +87,16 @@ function createId(){
   return Date.now() + Math.random();
 }
 
-let data = {
+let data = JSON.parse(localStorage.getItem("treeData")) || {
   id:createId(),
   name:"Ata",
+  note:"",
   spouse:null,
   children:[]
 };
+
+let selectedNode = null;
+let selectedType = "self";
 
 const svg = d3.select("svg");
 const g = svg.append("g");
@@ -58,6 +104,10 @@ const g = svg.append("g");
 svg.call(d3.zoom().on("zoom", (e)=>{
   g.attr("transform", e.transform);
 }));
+
+function saveTree(){
+  localStorage.setItem("treeData", JSON.stringify(data));
+}
 
 function getTextWidth(text){
   return text.length * 7 + 20;
@@ -89,7 +139,7 @@ function updateTree(){
 
     d.realX = d.x - d.totalWidth/2;
 
-    // 🔥 ASIL DÜZELTME (ÇIKIŞ NOKTASI)
+    // 🔥 TEK DÜZELTME BURADA
     if(d.data.spouse){
       d.linkX = d.realX + d.mainWidth + (gap / 2);
     } else {
@@ -126,7 +176,13 @@ function updateTree(){
       .attr("x",0)
       .attr("y",-15)
       .attr("width",d.mainWidth)
-      .attr("height",30);
+      .attr("height",30)
+      .on("click",(e)=>{
+        selectedNode = d.data;
+        selectedType = "self";
+        openModal(d.data);
+        e.stopPropagation();
+      });
 
     gNode.append("text")
       .attr("x",d.mainWidth/2)
@@ -142,7 +198,13 @@ function updateTree(){
         .attr("y",-15)
         .attr("width",d.spouseWidth)
         .attr("height",30)
-        .attr("fill","#ffe6e6");
+        .attr("fill","#ffe6e6")
+        .on("click",(e)=>{
+          selectedNode = d.data;
+          selectedType = "spouse";
+          openModal(d.data.spouse);
+          e.stopPropagation();
+        });
 
       gNode.append("text")
         .attr("x",startX + d.spouseWidth/2)
@@ -160,6 +222,92 @@ function updateTree(){
 
   });
 
+}
+
+function openModal(person){
+  document.getElementById("nameInput").value = person.name;
+  document.getElementById("noteInput").value = person.note || "";
+  document.getElementById("modal").style.display="flex";
+}
+
+function closeModal(){
+  document.getElementById("modal").style.display="none";
+}
+
+function save(){
+
+  const name = document.getElementById("nameInput").value;
+  const note = document.getElementById("noteInput").value;
+
+  if(selectedType === "self"){
+    selectedNode.name = name;
+    selectedNode.note = note;
+  } else {
+    selectedNode.spouse.name = name;
+    selectedNode.spouse.note = note;
+  }
+
+  saveTree();
+  closeModal();
+  updateTree();
+}
+
+function addChild(){
+
+  if(!selectedNode.children){
+    selectedNode.children = [];
+  }
+
+  selectedNode.children.push({
+    id:createId(),
+    name:"Yeni Kişi",
+    note:"",
+    spouse:null,
+    children:[]
+  });
+
+  saveTree();
+  updateTree();
+}
+
+function addSpouse(){
+
+  if(selectedNode.spouse){
+    alert("Zaten eşi var");
+    return;
+  }
+
+  selectedNode.spouse = {
+    id:createId(),
+    name:"Eş",
+    note:""
+  };
+
+  saveTree();
+  updateTree();
+}
+
+function deletePerson(){
+
+  if(!confirm("Silmek istediğine emin misin?")) return;
+
+  if(data === selectedNode){
+    alert("Ata silinemez");
+    return;
+  }
+
+  function removeNode(parent){
+    if(!parent.children) return;
+
+    parent.children = parent.children.filter(c => c !== selectedNode);
+    parent.children.forEach(child => removeNode(child));
+  }
+
+  removeNode(data);
+
+  saveTree();
+  closeModal();
+  updateTree();
 }
 
 updateTree();
