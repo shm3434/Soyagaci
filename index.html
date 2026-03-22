@@ -2,34 +2,42 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı PRO</title>
+<title>Soyağacı PRO+</title>
+
 <script src="https://d3js.org/d3.v7.min.js"></script>
 
 <style>
-body { margin:0; font-family:Arial; }
-svg { width:100vw; height:90vh; background:#f5f5f5; }
+body { margin:0; font-family: Arial; }
 
-.box {
+svg {
+  width:100vw;
+  height:85vh;
+  background:#f5f5f5;
+}
+
+.node rect {
   fill:white;
   stroke:black;
+  stroke-width:2px;
   rx:6;
 }
 
-.text {
+.node text {
   font-size:12px;
   text-anchor:middle;
 }
 
-.line {
-  stroke:black;
-  stroke-width:2;
+.link {
   fill:none;
+  stroke:black;
+  stroke-width:2px;
 }
 
 .modal {
   position:fixed;
-  top:0;left:0;
-  width:100%;height:100%;
+  top:0; left:0;
+  width:100%;
+  height:100%;
   background:rgba(0,0,0,0.5);
   display:none;
   justify-content:center;
@@ -43,156 +51,175 @@ svg { width:100vw; height:90vh; background:#f5f5f5; }
   width:300px;
 }
 
-button,input {
+input, textarea {
   width:100%;
   margin-top:10px;
+}
+
+button {
+  margin-top:10px;
+  width:100%;
 }
 </style>
 </head>
 
 <body>
 
+<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
+
 <svg></svg>
 
 <div class="modal" id="modal">
   <div class="modal-content">
     <input id="nameInput">
+    <textarea id="noteInput"></textarea>
     <button onclick="save()">Kaydet</button>
     <button onclick="addChild()">Çocuk Ekle</button>
     <button onclick="addSpouse()">Eş Ekle</button>
-    <button onclick="deleteNode()">Sil</button>
+    <button onclick="deletePerson()">Sil</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
 
 <script>
 
-function id(){ return Date.now()+Math.random(); }
+function createId(){
+  return Date.now() + Math.random();
+}
 
-let data = {
-  id:id(),
+let data = JSON.parse(localStorage.getItem("treeData")) || {
+  id:createId(),
   name:"Ata",
-  spouse:{name:"Eş"},
+  note:"",
+  spouse:null,
   children:[]
 };
 
-let selected=null;
-let type="self";
+let selectedNode = null;
+let selectedType = "self";
 
-const svg=d3.select("svg");
-const g=svg.append("g");
+const svg = d3.select("svg");
+const g = svg.append("g");
 
-svg.call(d3.zoom().on("zoom", e=>{
-  g.attr("transform",e.transform);
+svg.call(d3.zoom().on("zoom", (e)=>{
+  g.attr("transform", e.transform);
 }));
 
-const boxW=80, boxH=30, gapX=20, gapY=90;
+function saveTree(){
+  localStorage.setItem("treeData", JSON.stringify(data));
+}
 
-function getWidth(n){
-  if(!n.children || n.children.length===0) return boxW*2;
+function getTextWidth(text){
+  return text.length * 7 + 20;
+}
 
-  let w=0;
-  n.children.forEach(c=>{
-    w+=getWidth(c);
+function updateTree(){
+
+  g.selectAll("*").remove();
+
+  const root = d3.hierarchy(data);
+  const treeLayout = d3.tree().nodeSize([150,200]);
+  treeLayout(root);
+
+  root.descendants().forEach(d=>{
+    const gap = 20;
+
+    const mainWidth = getTextWidth(d.data.name);
+    const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
+
+    d.mainWidth = mainWidth;
+    d.spouseWidth = spouseWidth;
+
+    if(d.data.spouse){
+      d.totalWidth = mainWidth + gap + spouseWidth;
+      d.centerX = d.x + gap/2;
+    } else {
+      d.totalWidth = mainWidth;
+      d.centerX = d.x;
+    }
+
+    d.realX = d.centerX - d.totalWidth/2;
   });
 
-  return Math.max(w, boxW*2);
-}
+  g.selectAll(".link")
+    .data(root.links())
+    .enter()
+    .append("path")
+    .attr("class","link")
+    .attr("d", d=>`
+      M${d.source.centerX},${d.source.y}
+      V${(d.source.y + d.target.y)/2}
+      H${d.target.centerX}
+      V${d.target.y}
+    `);
 
-function draw(n,x,y){
+  const nodes = g.selectAll(".node")
+    .data(root.descendants())
+    .enter()
+    .append("g")
+    .attr("class","node")
+    .attr("transform", d=>`translate(${d.realX},${d.y})`);
 
-  const center=x;
+  nodes.each(function(d){
 
-  // ANA
-  g.append("rect")
-    .attr("class","box")
-    .attr("x",center-boxW-5)
-    .attr("y",y)
-    .attr("width",boxW)
-    .attr("height",boxH)
-    .on("click",()=>{
-      selected=n; type="self"; openModal(n);
-    });
+    const gNode = d3.select(this);
+    const gap = 20;
 
-  g.append("text")
-    .attr("class","text")
-    .attr("x",center-boxW/2-5)
-    .attr("y",y+20)
-    .text(n.name);
-
-  // EŞ
-  if(n.spouse){
-    g.append("rect")
-      .attr("class","box")
-      .attr("x",center+5)
-      .attr("y",y)
-      .attr("width",boxW)
-      .attr("height",boxH)
-      .on("click",()=>{
-        selected=n; type="spouse"; openModal(n.spouse);
+    gNode.append("rect")
+      .attr("x",0)
+      .attr("y",-15)
+      .attr("width",d.mainWidth)
+      .attr("height",30)
+      .on("click",(e)=>{
+        selectedNode = d.data;
+        selectedType = "self";
+        openModal(d.data);
+        e.stopPropagation();
       });
 
-    g.append("text")
-      .attr("class","text")
-      .attr("x",center+boxW/2+5)
-      .attr("y",y+20)
-      .text(n.spouse.name);
+    gNode.append("text")
+      .attr("x",d.mainWidth/2)
+      .attr("dy",4)
+      .text(d.data.name);
 
-    g.append("line")
-      .attr("class","line")
-      .attr("x1",center-5)
-      .attr("x2",center+5)
-      .attr("y1",y+boxH/2)
-      .attr("y2",y+boxH/2);
-  }
+    if(d.data.spouse){
 
-  if(n.children && n.children.length){
+      const startX = d.mainWidth + gap;
 
-    let total=getWidth(n);
-    let start=center-total/2;
+      gNode.append("rect")
+        .attr("x",startX)
+        .attr("y",-15)
+        .attr("width",d.spouseWidth)
+        .attr("height",30)
+        .attr("fill","#ffe6e6")
+        .on("click",(e)=>{
+          selectedNode = d.data;
+          selectedType = "spouse";
+          openModal(d.data.spouse);
+          e.stopPropagation();
+        });
 
-    // aşağı
-    g.append("line")
-      .attr("class","line")
-      .attr("x1",center)
-      .attr("x2",center)
-      .attr("y1",y+boxH)
-      .attr("y2",y+gapY/2);
+      gNode.append("text")
+        .attr("x",startX + d.spouseWidth/2)
+        .attr("dy",4)
+        .text(d.data.spouse.name);
 
-    // yatay
-    g.append("line")
-      .attr("class","line")
-      .attr("x1",start)
-      .attr("x2",start+total)
-      .attr("y1",y+gapY/2)
-      .attr("y2",y+gapY/2);
+      gNode.append("line")
+        .attr("x1", d.mainWidth)
+        .attr("x2", startX)
+        .attr("y1",0)
+        .attr("y2",0)
+        .attr("stroke","black")
+        .attr("stroke-width",2);
+    }
 
-    n.children.forEach(c=>{
-      let w=getWidth(c);
-      let cx=start+w/2;
+  });
 
-      g.append("line")
-        .attr("class","line")
-        .attr("x1",cx)
-        .attr("x2",cx)
-        .attr("y1",y+gapY/2)
-        .attr("y2",y+gapY);
-
-      draw(c,cx,y+gapY);
-
-      start+=w;
-    });
-  }
 }
 
-function update(){
-  g.selectAll("*").remove();
-  draw(data, window.innerWidth/2, 40);
-}
-
-// MODAL
-function openModal(p){
-  document.getElementById("nameInput").value=p.name;
+function openModal(person){
+  document.getElementById("nameInput").value = person.name;
+  document.getElementById("noteInput").value = person.note || "";
   document.getElementById("modal").style.display="flex";
 }
 
@@ -201,47 +228,82 @@ function closeModal(){
 }
 
 function save(){
-  let val=document.getElementById("nameInput").value;
-  if(type==="self") selected.name=val;
-  else selected.spouse.name=val;
 
-  closeModal(); update();
+  const name = document.getElementById("nameInput").value;
+  const note = document.getElementById("noteInput").value;
+
+  if(selectedType === "self"){
+    selectedNode.name = name;
+    selectedNode.note = note;
+  } else {
+    selectedNode.spouse.name = name;
+    selectedNode.spouse.note = note;
+  }
+
+  saveTree();
+  closeModal();
+  updateTree();
 }
 
 function addChild(){
-  if(!selected.children) selected.children=[];
-  selected.children.push({
-    id:id(),
-    name:"Yeni",
+
+  if(!selectedNode.children){
+    selectedNode.children = [];
+  }
+
+  selectedNode.children.push({
+    id:createId(),
+    name:"Yeni Kişi",
+    note:"",
     spouse:null,
     children:[]
   });
-  update();
+
+  saveTree();
+  updateTree();
 }
 
 function addSpouse(){
-  if(selected.spouse) return;
-  selected.spouse={name:"Eş"};
-  update();
+
+  if(selectedNode.spouse){
+    alert("Zaten eşi var");
+    return;
+  }
+
+  selectedNode.spouse = {
+    id:createId(),
+    name:"Eş",
+    note:""
+  };
+
+  saveTree();
+  updateTree();
 }
 
-function deleteNode(){
+function deletePerson(){
 
-  function remove(parent){
+  if(!confirm("Silmek istediğine emin misin?")) return;
+
+  if(data === selectedNode){
+    alert("Ata silinemez");
+    return;
+  }
+
+  function removeNode(parent){
     if(!parent.children) return;
 
-    parent.children=parent.children.filter(c=>c!==selected);
-    parent.children.forEach(remove);
+    parent.children = parent.children.filter(c => c !== selectedNode);
+    parent.children.forEach(child => removeNode(child));
   }
 
-  if(selected!==data){
-    remove(data);
-  }
+  removeNode(data);
 
-  update();
+  saveTree();
+  closeModal();
+  updateTree();
 }
 
-update();
+updateTree();
 
 </script>
 
