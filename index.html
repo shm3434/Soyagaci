@@ -66,7 +66,6 @@ button {
 <body>
 
 <h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
-
 <svg></svg>
 
 <div class="modal" id="modal">
@@ -77,27 +76,35 @@ button {
     <button onclick="addChild()">Çocuk Ekle</button>
     <button onclick="addSpouse()">Eş Ekle</button>
     <button onclick="addParent()">Ebeveyn Ekle</button>
-    <button onclick="deletePerson()">Sil</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
 
 <script>
 
+// 🔥 GLOBAL NODE SİSTEMİ
+let nodes = {};
+
 function createId(){
   return Date.now() + Math.random();
 }
 
-let data = JSON.parse(localStorage.getItem("treeData")) || {
-  id:createId(),
-  name:"Ata",
-  note:"",
-  spouse:null,
-  children:[]
-};
+function createNode(name){
+  const id = createId();
+  nodes[id] = {
+    id,
+    name,
+    note:"",
+    spouseId:null,
+    children:[]
+  };
+  return nodes[id];
+}
+
+// root
+let root = createNode("Ata");
 
 let selectedNode = null;
-let selectedType = "self";
 
 const svg = d3.select("svg");
 const g = svg.append("g");
@@ -106,147 +113,99 @@ svg.call(d3.zoom().on("zoom", (e)=>{
   g.attr("transform", e.transform);
 }));
 
-function saveTree(){
-  localStorage.setItem("treeData", JSON.stringify(data));
-}
-
 function getTextWidth(text){
   return text.length * 7 + 20;
 }
 
-function getMaxChildren(node){
-  let max = node.children ? node.children.length : 0;
-  if(node.children){
-    node.children.forEach(c=>{
-      max = Math.max(max, getMaxChildren(c));
-    });
-  }
-  return max;
-}
-
-// 🔥 SADECE BURASI DEĞİŞTİ (KOPYA YOK)
-function prepareTree(node){
-
-  if(node.children){
-    node.children.forEach(c => prepareTree(c));
-  }
-
-  return node;
+// 🔥 TREE (SADECE CHILDREN)
+function buildTree(node){
+  return {
+    ...node,
+    children: node.children.map(id => buildTree(nodes[id]))
+  };
 }
 
 function updateTree(){
 
   g.selectAll("*").remove();
 
-  const root = d3.hierarchy(prepareTree(data));
+  const rootData = d3.hierarchy(buildTree(root));
 
-  const maxChildren = getMaxChildren(data);
-  const dynamicSpacing = Math.max(150, maxChildren * 70);
+  const treeLayout = d3.tree().nodeSize([150,200]);
+  treeLayout(rootData);
 
-  const treeLayout = d3.tree().nodeSize([dynamicSpacing,200]);
-  treeLayout(root);
-
-  root.descendants().forEach(d=>{
-    if(d.children && d.children.length){
-      const avg = d3.mean(d.children, c => c.x);
-      d.x = avg;
-    }
-  });
-
-  root.descendants().forEach(d=>{
-
-    const gap = 60;
-
-    const mainWidth = getTextWidth(d.data.name);
-    const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
-
-    d.mainWidth = mainWidth;
-    d.spouseWidth = spouseWidth;
-
-    if(d.data.spouse){
-      d.totalWidth = mainWidth + gap + spouseWidth;
-    } else {
-      d.totalWidth = mainWidth;
-    }
-
-    d.realX = d.x - d.totalWidth/2;
-
-    d.linkX = d.realX + (d.mainWidth / 2);
-
-    if(d.data.spouse){
-      d.childCenterX = d.realX + d.mainWidth + (gap / 2);
-    } else {
-      d.childCenterX = d.realX + (d.mainWidth / 2);
-    }
-
-  });
-
+  // çizgiler
   g.selectAll(".link")
-    .data(root.links())
+    .data(rootData.links())
     .enter()
     .append("path")
     .attr("class","link")
     .attr("d", d=>`
-      M${d.source.childCenterX},${d.source.y}
+      M${d.source.x},${d.source.y}
       V${(d.source.y + d.target.y)/2}
-      H${d.target.linkX}
+      H${d.target.x}
       V${d.target.y}
     `);
 
-  const nodes = g.selectAll(".node")
-    .data(root.descendants())
+  // node
+  const nodesDraw = g.selectAll(".node")
+    .data(rootData.descendants())
     .enter()
     .append("g")
     .attr("class","node")
-    .attr("transform", d=>`translate(${d.realX},${d.y})`);
+    .attr("transform", d=>`translate(${d.x},${d.y})`);
 
-  nodes.each(function(d){
+  nodesDraw.each(function(d){
 
+    const node = nodes[d.data.id];
     const gNode = d3.select(this);
-    const gap = 60;
 
+    const width = getTextWidth(node.name);
+
+    // ana kutu
     gNode.append("rect")
-      .attr("x",0)
+      .attr("x",-width/2)
       .attr("y",-15)
-      .attr("width",d.mainWidth)
+      .attr("width",width)
       .attr("height",30)
       .on("click",(e)=>{
-        selectedNode = d.data;
-        selectedType = "self";
-        openModal(d.data);
+        selectedNode = node;
+        openModal(node);
         e.stopPropagation();
       });
 
     gNode.append("text")
-      .attr("x",d.mainWidth/2)
       .attr("dy",4)
-      .text(d.data.name);
+      .text(node.name);
 
-    if(d.data.spouse){
+    // 🔥 EŞ (SADECE GÖRSEL)
+    if(node.spouseId){
 
-      const startX = d.mainWidth + gap;
+      const spouse = nodes[node.spouseId];
+      const spouseWidth = getTextWidth(spouse.name);
+
+      const offset = width/2 + 20;
 
       gNode.append("rect")
-        .attr("x",startX)
+        .attr("x",offset)
         .attr("y",-15)
-        .attr("width",d.spouseWidth)
+        .attr("width",spouseWidth)
         .attr("height",30)
         .attr("fill","#ffe6e6")
         .on("click",(e)=>{
-          selectedNode = d.data.spouse;
-          selectedType = "spouse";
-          openModal(d.data.spouse);
+          selectedNode = spouse;
+          openModal(spouse);
           e.stopPropagation();
         });
 
       gNode.append("text")
-        .attr("x",startX + d.spouseWidth/2)
+        .attr("x",offset + spouseWidth/2)
         .attr("dy",4)
-        .text(d.data.spouse.name);
+        .text(spouse.name);
 
       gNode.append("line")
-        .attr("x1", d.mainWidth)
-        .attr("x2", startX)
+        .attr("x1", width/2)
+        .attr("x2", offset)
         .attr("y1",0)
         .attr("y2",0)
         .attr("stroke","black");
@@ -256,80 +215,7 @@ function updateTree(){
 
 }
 
-// 🔥 FONKSİYONLAR TAM ÇALIŞIR
-function addSpouse(){
-  if(selectedNode.spouse){
-    alert("Zaten eşi var");
-    return;
-  }
-  selectedNode.spouse = {
-    id:createId(),
-    name:"Eş",
-    note:"",
-    children:[]
-  };
-  saveTree();
-  updateTree();
-}
-
-function addChild(){
-  if(!selectedNode.children){
-    selectedNode.children = [];
-  }
-  selectedNode.children.push({
-    id:createId(),
-    name:"Yeni Kişi",
-    note:"",
-    spouse:null,
-    children:[]
-  });
-  saveTree();
-  updateTree();
-}
-
-function addParent(){
-
-  function insert(node){
-    if(!node.children) return;
-
-    node.children = node.children.map(c=>{
-      if(c.id === selectedNode.id){
-        return {
-          id:createId(),
-          name:"Yeni Ebeveyn",
-          spouse:null,
-          children:[c]
-        };
-      }
-      insert(c);
-      return c;
-    });
-  }
-
-  if(data.id === selectedNode.id){
-    data = {
-      id:createId(),
-      name:"Yeni Ebeveyn",
-      spouse:null,
-      children:[data]
-    };
-  } else {
-    insert(data);
-  }
-
-  saveTree();
-  updateTree();
-  closeModal();
-}
-
-function save(){
-  selectedNode.name = document.getElementById("nameInput").value;
-  selectedNode.note = document.getElementById("noteInput").value;
-  saveTree();
-  updateTree();
-  closeModal();
-}
-
+// 🔥 MODAL
 function openModal(person){
   document.getElementById("nameInput").value = person.name;
   document.getElementById("noteInput").value = person.note || "";
@@ -340,7 +226,62 @@ function closeModal(){
   document.getElementById("modal").style.display="none";
 }
 
-function deletePerson(){}
+function save(){
+  selectedNode.name = document.getElementById("nameInput").value;
+  selectedNode.note = document.getElementById("noteInput").value;
+  updateTree();
+  closeModal();
+}
+
+// 🔥 ÇOCUK
+function addChild(){
+  const child = createNode("Yeni Kişi");
+  selectedNode.children.push(child.id);
+  updateTree();
+}
+
+// 🔥 EŞ (BAĞIMSIZ)
+function addSpouse(){
+
+  if(selectedNode.spouseId){
+    alert("Zaten eşi var");
+    return;
+  }
+
+  const spouse = createNode("Eş");
+
+  selectedNode.spouseId = spouse.id;
+  spouse.spouseId = selectedNode.id;
+
+  updateTree();
+}
+
+// 🔥 EBEVEYN (BUG YOK)
+function addParent(){
+
+  const parent = createNode("Yeni Ebeveyn");
+  parent.children.push(selectedNode.id);
+
+  if(root.id === selectedNode.id){
+    root = parent;
+  } else {
+
+    function replace(node){
+      node.children = node.children.map(id=>{
+        if(id === selectedNode.id){
+          return parent.id;
+        }
+        replace(nodes[id]);
+        return id;
+      });
+    }
+
+    replace(root);
+  }
+
+  updateTree();
+  closeModal();
+}
 
 updateTree();
 
