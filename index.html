@@ -1,290 +1,261 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>Soyağacı PRO+</title>
-
-<script src="https://d3js.org/d3.v7.min.js"></script>
-
-<style>
-body { margin:0; font-family: Arial; }
-
-svg {
-  width:100vw;
-  height:85vh;
-  background:#f5f5f5;
-}
-
-.node rect {
-  fill:white;
-  stroke:black;
-  stroke-width:2px;
-  rx:6;
-}
-
-.node text {
-  font-size:12px;
-  text-anchor:middle;
-}
-
-.link {
-  fill:none;
-  stroke:black;
-  stroke-width:2px;
-}
-
-.modal {
-  position:fixed;
-  top:0; left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.5);
-  display:none;
-  justify-content:center;
-  align-items:center;
-}
-
-.modal-content {
-  background:white;
-  padding:20px;
-  border-radius:10px;
-  width:300px;
-}
-
-input, textarea {
-  width:100%;
-  margin-top:10px;
-}
-
-button {
-  margin-top:10px;
-  width:100%;
-}
-</style>
+    <meta charset="UTF-8">
+    <title>Soyağacı PRO+ (Bağımsız Eş Desteği)</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { margin:0; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }
+        svg { width:100vw; height:100vh; background:#f8f9fa; }
+        .node rect { fill:white; stroke:#2c3e50; stroke-width:2px; rx:8; }
+        .node text { font-size:12px; font-weight: bold; text-anchor:middle; fill: #2c3e50; pointer-events: none; }
+        .link { fill:none; stroke:#95a5a6; stroke-width:2px; }
+        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:none; justify-content:center; align-items:center; z-index: 1000; }
+        .modal-content { background:white; padding:25px; border-radius:12px; width:320px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        h3 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        input, textarea { width:100%; margin-top:10px; padding: 8px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+        button { padding: 10px; cursor: pointer; border: none; border-radius: 4px; transition: 0.2s; font-weight: bold; }
+        .btn-save { background: #27ae60; color: white; grid-column: span 2; }
+        .btn-add { background: #3498db; color: white; }
+        .btn-del { background: #e74c3c; color: white; }
+        .btn-close { background: #95a5a6; color: white; grid-column: span 2; }
+        button:hover { opacity: 0.8; }
+    </style>
 </head>
-
 <body>
 
-<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
+<div id="ui" style="position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none;">
+    <h2 style="margin:0;">🌳 Soyağacı PRO+</h2>
+    <small>Kişilere tıklayarak düzenleme yapabilirsiniz</small>
+</div>
+
 <svg></svg>
 
 <div class="modal" id="modal">
-  <div class="modal-content">
-    <input id="nameInput">
-    <textarea id="noteInput"></textarea>
-    <button onclick="save()">Kaydet</button>
-    <button onclick="addChild()">Çocuk Ekle</button>
-    <button onclick="addSpouse()">Eş Ekle</button>
-    <button onclick="addParent()">Ebeveyn Ekle</button>
-    <button onclick="closeModal()">Kapat</button>
-  </div>
+    <div class="modal-content">
+        <h3 id="modalTitle">Kişi Düzenle</h3>
+        <label>İsim:</label>
+        <input id="nameInput" placeholder="İsim yazınız...">
+        <label>Notlar:</label>
+        <textarea id="noteInput" rows="3"></textarea>
+        
+        <div class="btn-group">
+            <button class="btn-save" onclick="save()">💾 Değişiklikleri Kaydet</button>
+            <button class="btn-add" onclick="addChild()">👶 Çocuk Ekle</button>
+            <button class="btn-add" onclick="addSpouse()">💍 Eş Ekle</button>
+            <button class="btn-add" onclick="addParent()">⬆️ Ebeveyn Ekle</button>
+            <button class="btn-del" onclick="deletePerson()">🗑️ Sil</button>
+            <button class="btn-close" onclick="closeModal()">❌ Kapat</button>
+        </div>
+    </div>
 </div>
 
 <script>
+// --- VERİ YÖNETİMİ ---
+function createId(){ return "id_" + Date.now() + "_" + Math.floor(Math.random()*1000); }
 
-// 🔥 GLOBAL NODE SİSTEMİ
-let nodes = {};
+let data = JSON.parse(localStorage.getItem("treeDataV2")) || {
+    id: createId(),
+    name: "Ata Kişi",
+    note: "",
+    spouse: null,
+    children: []
+};
 
-function createId(){
-  return Date.now() + Math.random();
-}
-
-function createNode(name){
-  const id = createId();
-  nodes[id] = {
-    id,
-    name,
-    note:"",
-    spouseId:null,
-    children:[]
-  };
-  return nodes[id];
-}
-
-// root
-let root = createNode("Ata");
-
-let selectedNode = null;
+let selectedNode = null; 
+let selectedType = "self"; // "self" veya "spouse"
 
 const svg = d3.select("svg");
 const g = svg.append("g");
 
-svg.call(d3.zoom().on("zoom", (e)=>{
-  g.attr("transform", e.transform);
-}));
+svg.call(d3.zoom().on("zoom", (e) => { g.attr("transform", e.transform); }));
 
-function getTextWidth(text){
-  return text.length * 7 + 20;
-}
+function saveTree(){ localStorage.setItem("treeDataV2", JSON.stringify(data)); }
 
-// 🔥 TREE (SADECE CHILDREN)
-function buildTree(node){
-  return {
-    ...node,
-    children: node.children.map(id => buildTree(nodes[id]))
-  };
-}
+// --- ÇİZİM MOTORU ---
+function getTextWidth(text){ return (text ? text.length : 5) * 8 + 30; }
 
-function updateTree(){
+function updateTree() {
+    g.selectAll("*").remove();
+    const root = d3.hierarchy(data);
+    const treeLayout = d3.tree().nodeSize([220, 180]);
+    treeLayout(root);
 
-  g.selectAll("*").remove();
-
-  const rootData = d3.hierarchy(buildTree(root));
-
-  const treeLayout = d3.tree().nodeSize([150,200]);
-  treeLayout(rootData);
-
-  // çizgiler
-  g.selectAll(".link")
-    .data(rootData.links())
-    .enter()
-    .append("path")
-    .attr("class","link")
-    .attr("d", d=>`
-      M${d.source.x},${d.source.y}
-      V${(d.source.y + d.target.y)/2}
-      H${d.target.x}
-      V${d.target.y}
-    `);
-
-  // node
-  const nodesDraw = g.selectAll(".node")
-    .data(rootData.descendants())
-    .enter()
-    .append("g")
-    .attr("class","node")
-    .attr("transform", d=>`translate(${d.x},${d.y})`);
-
-  nodesDraw.each(function(d){
-
-    const node = nodes[d.data.id];
-    const gNode = d3.select(this);
-
-    const width = getTextWidth(node.name);
-
-    // ana kutu
-    gNode.append("rect")
-      .attr("x",-width/2)
-      .attr("y",-15)
-      .attr("width",width)
-      .attr("height",30)
-      .on("click",(e)=>{
-        selectedNode = node;
-        openModal(node);
-        e.stopPropagation();
-      });
-
-    gNode.append("text")
-      .attr("dy",4)
-      .text(node.name);
-
-    // 🔥 EŞ (SADECE GÖRSEL)
-    if(node.spouseId){
-
-      const spouse = nodes[node.spouseId];
-      const spouseWidth = getTextWidth(spouse.name);
-
-      const offset = width/2 + 20;
-
-      gNode.append("rect")
-        .attr("x",offset)
-        .attr("y",-15)
-        .attr("width",spouseWidth)
-        .attr("height",30)
-        .attr("fill","#ffe6e6")
-        .on("click",(e)=>{
-          selectedNode = spouse;
-          openModal(spouse);
-          e.stopPropagation();
+    // Bağlantıları Çiz (Linkler)
+    g.selectAll(".link")
+        .data(root.links())
+        .enter()
+        .append("path")
+        .attr("class", "link")
+        .attr("d", d => {
+            const startX = d.source.x + (d.source.data.spouse ? 40 : 0);
+            return `M${startX},${d.source.y} V${(d.source.y + d.target.y)/2} H${d.target.x} V${d.target.y}`;
         });
 
-      gNode.append("text")
-        .attr("x",offset + spouseWidth/2)
-        .attr("dy",4)
-        .text(spouse.name);
+    // Düğümleri Çiz (Nodes)
+    const nodes = g.selectAll(".node")
+        .data(root.descendants())
+        .enter()
+        .append("g")
+        .attr("class", "node")
+        .attr("transform", d => `translate(${d.x},${d.y})`);
 
-      gNode.append("line")
-        .attr("x1", width/2)
-        .attr("x2", offset)
-        .attr("y1",0)
-        .attr("y2",0)
-        .attr("stroke","black");
-    }
+    nodes.each(function(d) {
+        const nodeGroup = d3.select(this);
+        const nameWidth = getTextWidth(d.data.name);
 
-  });
+        // Ana Kişi Kutusu
+        nodeGroup.append("rect")
+            .attr("x", -nameWidth/2)
+            .attr("y", -18)
+            .attr("width", nameWidth)
+            .attr("height", 36)
+            .on("click", (e) => {
+                selectedNode = d.data;
+                selectedType = "self";
+                openModal(d.data);
+                e.stopPropagation();
+            });
 
-}
+        nodeGroup.append("text")
+            .attr("dy", 5)
+            .text(d.data.name);
 
-// 🔥 MODAL
-function openModal(person){
-  document.getElementById("nameInput").value = person.name;
-  document.getElementById("noteInput").value = person.note || "";
-  document.getElementById("modal").style.display="flex";
-}
+        // Eş Kutusu (Varsa)
+        if (d.data.spouse) {
+            const spWidth = getTextWidth(d.data.spouse.name);
+            const spX = nameWidth/2 + 30;
 
-function closeModal(){
-  document.getElementById("modal").style.display="none";
-}
+            // Bağlantı çizgisi
+            nodeGroup.append("line")
+                .attr("x1", nameWidth/2).attr("y1", 0)
+                .attr("x2", spX).attr("y2", 0)
+                .attr("stroke", "#e91e63").attr("stroke-width", 2).attr("stroke-dasharray", "4,2");
 
-function save(){
-  selectedNode.name = document.getElementById("nameInput").value;
-  selectedNode.note = document.getElementById("noteInput").value;
-  updateTree();
-  closeModal();
-}
+            nodeGroup.append("rect")
+                .attr("x", spX)
+                .attr("y", -18)
+                .attr("width", spWidth)
+                .attr("height", 36)
+                .attr("fill", "#fff0f5")
+                .attr("stroke", "#e91e63")
+                .on("click", (e) => {
+                    selectedNode = d.data.spouse;
+                    selectedType = "spouse";
+                    openModal(d.data.spouse);
+                    e.stopPropagation();
+                });
 
-// 🔥 ÇOCUK
-function addChild(){
-  const child = createNode("Yeni Kişi");
-  selectedNode.children.push(child.id);
-  updateTree();
-}
-
-// 🔥 EŞ (BAĞIMSIZ)
-function addSpouse(){
-
-  if(selectedNode.spouseId){
-    alert("Zaten eşi var");
-    return;
-  }
-
-  const spouse = createNode("Eş");
-
-  selectedNode.spouseId = spouse.id;
-  spouse.spouseId = selectedNode.id;
-
-  updateTree();
-}
-
-// 🔥 EBEVEYN (BUG YOK)
-function addParent(){
-
-  const parent = createNode("Yeni Ebeveyn");
-  parent.children.push(selectedNode.id);
-
-  if(root.id === selectedNode.id){
-    root = parent;
-  } else {
-
-    function replace(node){
-      node.children = node.children.map(id=>{
-        if(id === selectedNode.id){
-          return parent.id;
+            nodeGroup.append("text")
+                .attr("x", spX + spWidth/2)
+                .attr("dy", 5)
+                .text(d.data.spouse.name);
         }
-        replace(nodes[id]);
-        return id;
-      });
-    }
-
-    replace(root);
-  }
-
-  updateTree();
-  closeModal();
+    });
 }
 
-updateTree();
+// --- AKSİYONLAR ---
 
+function openModal(person) {
+    document.getElementById("modalTitle").innerText = person.name;
+    document.getElementById("nameInput").value = person.name;
+    document.getElementById("noteInput").value = person.note || "";
+    document.getElementById("modal").style.display = "flex";
+}
+
+function closeModal() { document.getElementById("modal").style.display = "none"; }
+
+function save() {
+    selectedNode.name = document.getElementById("nameInput").value;
+    selectedNode.note = document.getElementById("noteInput").value;
+    saveTree(); closeModal(); updateTree();
+}
+
+function addChild() {
+    if (selectedType === "spouse") {
+        alert("Çocukları lütfen ana kişi üzerinden ekleyiniz.");
+        return;
+    }
+    if (!selectedNode.children) selectedNode.children = [];
+    selectedNode.children.push({ id: createId(), name: "Yeni Çocuk", note: "", spouse: null, children: [] });
+    saveTree(); updateTree();
+}
+
+function addSpouse() {
+    if (selectedType === "spouse" || selectedNode.spouse) {
+        alert("Zaten bir eş tanımlı.");
+        return;
+    }
+    selectedNode.spouse = { id: createId(), name: "Eş", note: "" };
+    saveTree(); updateTree();
+}
+
+// 🔥 DÜZELTİLMİŞ EBEVEYN EKLEME (Eş Desteği Dahil)
+function addParent() {
+    function findAndReplace(current) {
+        if (!current.children) return false;
+
+        for (let i = 0; i < current.children.length; i++) {
+            let child = current.children[i];
+
+            // 1. Durum: Ana kişi seçiliyse
+            if (selectedType === "self" && child.id === selectedNode.id) {
+                const newParent = { id: createId(), name: "Yeni Ebeveyn", children: [child] };
+                current.children[i] = newParent;
+                return true;
+            }
+
+            // 2. Durum: Eş seçiliyse (Eşi bağımsız bir dala taşır)
+            if (selectedType === "spouse" && child.spouse && child.spouse.id === selectedNode.id) {
+                const spouseData = child.spouse;
+                child.spouse = null; // Eski yerinden eşi sil
+                const newParent = { id: createId(), name: "Eşin Ebeveyni", children: [spouseData] };
+                current.children.push(newParent); // Aynı seviyeye yeni bir dal olarak ekle
+                return true;
+            }
+
+            if (findAndReplace(child)) return true;
+        }
+        return false;
+    }
+
+    // Kök (Ata) kontrolü
+    if (data.id === selectedNode.id && selectedType === "self") {
+        data = { id: createId(), name: "Yeni Üst Soy", children: [data] };
+    } else if (selectedType === "spouse" && data.spouse && data.spouse.id === selectedNode.id) {
+        // Eğer kökün eşine ebeveyn ekleniyorsa
+        const spouseData = data.spouse;
+        data.spouse = null;
+        const oldData = data;
+        data = { id: createId(), name: "Aile Kökü", children: [oldData, { id: createId(), name: "Eş Soyu", children: [spouseData] }] };
+    } else {
+        findAndReplace(data);
+    }
+
+    saveTree(); closeModal(); updateTree();
+}
+
+function deletePerson() {
+    if (data.id === selectedNode.id) { alert("Ana kök silinemez."); return; }
+    if (!confirm("Bu kişiyi ve alt soyunu silmek istediğinize emin misiniz?")) return;
+
+    function removeRecursive(parent) {
+        if (!parent.children) return;
+        parent.children = parent.children.filter(c => {
+            if (c.id === selectedNode.id) return false;
+            if (c.spouse && c.spouse.id === selectedNode.id) { c.spouse = null; return true; }
+            return true;
+        });
+        parent.children.forEach(removeRecursive);
+    }
+
+    removeRecursive(data);
+    saveTree(); closeModal(); updateTree();
+}
+
+// Başlat
+updateTree();
 </script>
 
 </body>
