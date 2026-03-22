@@ -72,30 +72,30 @@ function updateTree(){
   const treeLayout = d3.tree().nodeSize([200,220]);
   treeLayout(root);
 
-  // NODE HESAPLAMA
+  // 🔥 NODE HESAP
   root.descendants().forEach(d=>{
     const gap = 20;
 
     const mainWidth = getTextWidth(d.data.name);
     const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
 
-    const totalWidth = mainWidth + (d.data.spouse ? gap + spouseWidth : 0);
-
     d.mainWidth = mainWidth;
     d.spouseWidth = spouseWidth;
-    d.totalWidth = totalWidth;
 
-    // 🔥 GERÇEK MERKEZ (EŞ VARSA ORTA NOKTA)
     if(d.data.spouse){
+      d.totalWidth = mainWidth + gap + spouseWidth;
+
+      // 🔥 ORTA = EŞLER ARASI ÇİZGİNİN ORTASI
       d.centerX = d.x + (spouseWidth + gap)/2;
     } else {
+      d.totalWidth = mainWidth;
       d.centerX = d.x;
     }
 
-    d.realX = d.centerX - totalWidth/2;
+    d.realX = d.centerX - d.totalWidth/2;
   });
 
-  // 🔥 ÇOCUK ÇİZGİLERİ TAM ORTADAN
+  // 🔥 LINKLER (GERÇEK ORTA)
   g.selectAll(".link")
     .data(root.links())
     .enter()
@@ -120,7 +120,7 @@ function updateTree(){
     const gNode = d3.select(this);
     const gap = 20;
 
-    // ANA
+    // ANA KUTU
     gNode.append("rect")
       .attr("x",0)
       .attr("y",-15)
@@ -132,11 +132,11 @@ function updateTree(){
       .attr("dy",4)
       .text(d.data.name);
 
-    // EŞ
     if(d.data.spouse){
 
       const startX = d.mainWidth + gap;
 
+      // EŞ KUTU
       gNode.append("rect")
         .attr("x",startX)
         .attr("y",-15)
@@ -149,10 +149,10 @@ function updateTree(){
         .attr("dy",4)
         .text(d.data.spouse.name);
 
-      // 🔥 EŞ ÇİZGİSİ (3X UZATILDI)
+      // 🔥 EŞ ÇİZGİSİ (KUTU DIŞINDAN)
       gNode.append("line")
-        .attr("x1", d.mainWidth - 20)
-        .attr("x2", startX + d.spouseWidth + 20)
+        .attr("x1", d.mainWidth) // ana kutu bitişi
+        .attr("x2", startX)      // eş kutu başlangıcı
         .attr("y1",0)
         .attr("y2",0)
         .attr("stroke","black")
@@ -163,7 +163,7 @@ function updateTree(){
 
 }
 
-// TEST DATA
+// TEST
 data.children.push({
   id:createId(),
   name:"Yeni Kişi",
