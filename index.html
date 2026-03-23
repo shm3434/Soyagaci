@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Soyağacı FIXED</title>
+<title>Soyağacı PRO+</title>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 
@@ -65,29 +65,44 @@ button {
 
 <body>
 
-<h3 style="text-align:center;">🌳 Soyağacı</h3>
-
+<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
 <svg></svg>
 
 <div class="modal" id="modal">
   <div class="modal-content">
     <input id="nameInput">
+    <textarea id="noteInput"></textarea>
     <button onclick="save()">Kaydet</button>
     <button onclick="addChild()">Çocuk Ekle</button>
     <button onclick="addSpouse()">Eş Ekle</button>
+    <button onclick="addParent()">Ebeveyn Ekle</button>
     <button onclick="closeModal()">Kapat</button>
   </div>
 </div>
 
 <script>
 
-let data = {
-  name:"Ata",
-  children:[
-    { name:"Ahmet", children:[{name:"Ali"},{name:"Ayşe"}]},
-    { name:"Mehmet", children:[{name:"Hasan"},{name:"Zeynep"}]}
-  ]
-};
+// 🔥 GLOBAL NODE SİSTEMİ
+let nodes = {};
+
+function createId(){
+  return Date.now() + Math.random();
+}
+
+function createNode(name){
+  const id = createId();
+  nodes[id] = {
+    id,
+    name,
+    note:"",
+    spouseId:null,
+    children:[]
+  };
+  return nodes[id];
+}
+
+// root
+let root = createNode("Ata");
 
 let selectedNode = null;
 
@@ -98,30 +113,30 @@ svg.call(d3.zoom().on("zoom", (e)=>{
   g.attr("transform", e.transform);
 }));
 
-// 🔥 TEK ÇOCUK FIX
-function normalize(node){
-  if(node.children && node.children.length === 1){
-    node.children.push({name:"", ghost:true});
-  }
-  if(node.children){
-    node.children.forEach(normalize);
-  }
+function getTextWidth(text){
+  return text.length * 7 + 20;
+}
+
+// 🔥 TREE (SADECE CHILDREN)
+function buildTree(node){
+  return {
+    ...node,
+    children: node.children.map(id => buildTree(nodes[id]))
+  };
 }
 
 function updateTree(){
 
   g.selectAll("*").remove();
 
-  const clone = JSON.parse(JSON.stringify(data));
-  normalize(clone);
+  const rootData = d3.hierarchy(buildTree(root));
 
-  const root = d3.hierarchy(clone);
-  const treeLayout = d3.tree().nodeSize([90,150]);
-  treeLayout(root);
+  const treeLayout = d3.tree().nodeSize([150,200]);
+  treeLayout(rootData);
 
-  // 🔥 LİNKLER
+  // çizgiler
   g.selectAll(".link")
-    .data(root.links())
+    .data(rootData.links())
     .enter()
     .append("path")
     .attr("class","link")
@@ -132,66 +147,79 @@ function updateTree(){
       V${d.target.y}
     `);
 
-  const nodes = g.selectAll(".node")
-    .data(root.descendants().filter(d=>!d.data.ghost))
+  // node
+  const nodesDraw = g.selectAll(".node")
+    .data(rootData.descendants())
     .enter()
     .append("g")
     .attr("class","node")
     .attr("transform", d=>`translate(${d.x},${d.y})`);
 
-  // ANA NODE
-  nodes.append("rect")
-    .attr("x",-30)
-    .attr("y",-15)
-    .attr("width",60)
-    .attr("height",30);
+  nodesDraw.each(function(d){
 
-  nodes.append("text")
-    .attr("dy",4)
-    .text(d=>d.data.name);
+    const node = nodes[d.data.id];
+    const gNode = d3.select(this);
 
-  // 🔥 EŞ DÜZGÜN ÇİZİM
-  nodes.each(function(d){
+    const width = getTextWidth(node.name);
 
-    if(d.data.spouse){
+    // ana kutu
+    gNode.append("rect")
+      .attr("x",-width/2)
+      .attr("y",-15)
+      .attr("width",width)
+      .attr("height",30)
+      .on("click",(e)=>{
+        selectedNode = node;
+        openModal(node);
+        e.stopPropagation();
+      });
 
-      const offset = 80;
+    gNode.append("text")
+      .attr("dy",4)
+      .text(node.name);
 
-      // eş kutu
-      d3.select(this)
-        .append("rect")
-        .attr("x",offset-30)
-        .attr("y",-15)
-        .attr("width",60)
-        .attr("height",30);
+    // 🔥 EŞ (SADECE GÖRSEL)
+    if(node.spouseId){
 
-      d3.select(this)
-        .append("text")
+      const spouse = nodes[node.spouseId];
+      const spouseWidth = getTextWidth(spouse.name);
+
+      const offset = width/2 + 20;
+
+      gNode.append("rect")
         .attr("x",offset)
-        .attr("dy",4)
-        .text(d.data.spouse.name);
+        .attr("y",-15)
+        .attr("width",spouseWidth)
+        .attr("height",30)
+        .attr("fill","#ffe6e6")
+        .on("click",(e)=>{
+          selectedNode = spouse;
+          openModal(spouse);
+          e.stopPropagation();
+        });
 
-      // eş çizgi
-      d3.select(this)
-        .append("line")
-        .attr("x1",30)
-        .attr("x2",offset-30)
+      gNode.append("text")
+        .attr("x",offset + spouseWidth/2)
+        .attr("dy",4)
+        .text(spouse.name);
+
+      gNode.append("line")
+        .attr("x1", width/2)
+        .attr("x2", offset)
         .attr("y1",0)
         .attr("y2",0)
         .attr("stroke","black");
-
-      // 🔥 ÇOCUK BAĞLANTI NOKTASI ORTALAMA
-      d.x = d.x + offset/2;
     }
 
   });
 
-  nodes.on("click",(e,d)=>{
-    selectedNode = d.data;
-    document.getElementById("nameInput").value = d.data.name;
-    document.getElementById("modal").style.display="flex";
-  });
+}
 
+// 🔥 MODAL
+function openModal(person){
+  document.getElementById("nameInput").value = person.name;
+  document.getElementById("noteInput").value = person.note || "";
+  document.getElementById("modal").style.display="flex";
 }
 
 function closeModal(){
@@ -200,21 +228,59 @@ function closeModal(){
 
 function save(){
   selectedNode.name = document.getElementById("nameInput").value;
+  selectedNode.note = document.getElementById("noteInput").value;
+  updateTree();
   closeModal();
-  updateTree();
 }
 
+// 🔥 ÇOCUK
 function addChild(){
-  if(!selectedNode.children){
-    selectedNode.children = [];
-  }
-  selectedNode.children.push({ name:"Yeni" });
+  const child = createNode("Yeni Kişi");
+  selectedNode.children.push(child.id);
   updateTree();
 }
 
+// 🔥 EŞ (BAĞIMSIZ)
 function addSpouse(){
-  selectedNode.spouse = { name:"Eş" };
+
+  if(selectedNode.spouseId){
+    alert("Zaten eşi var");
+    return;
+  }
+
+  const spouse = createNode("Eş");
+
+  selectedNode.spouseId = spouse.id;
+  spouse.spouseId = selectedNode.id;
+
   updateTree();
+}
+
+// 🔥 EBEVEYN (BUG YOK)
+function addParent(){
+
+  const parent = createNode("Yeni Ebeveyn");
+  parent.children.push(selectedNode.id);
+
+  if(root.id === selectedNode.id){
+    root = parent;
+  } else {
+
+    function replace(node){
+      node.children = node.children.map(id=>{
+        if(id === selectedNode.id){
+          return parent.id;
+        }
+        replace(nodes[id]);
+        return id;
+      });
+    }
+
+    replace(root);
+  }
+
+  updateTree();
+  closeModal();
 }
 
 updateTree();
