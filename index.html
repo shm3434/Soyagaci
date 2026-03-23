@@ -3,385 +3,645 @@
 <head>
 <meta charset="UTF-8">
 <title>Soyağacı PRO+</title>
-
 <script src="https://d3js.org/d3.v7.min.js"></script>
-
 <style>
-body { margin:0; font-family: Arial; }
-
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial; background: #f0f0f0; }
+h3 { text-align: center; margin: 8px 0; font-size: 16px; }
+#toolbar { text-align: center; margin-bottom: 4px; }
+#toolbar button {
+  margin: 0 4px; padding: 4px 12px; cursor: pointer;
+  border-radius: 4px; border: 1px solid #aaa; background: white;
+}
 svg {
-  width:100vw;
-  height:85vh;
-  background:#f5f5f5;
+  display: block; width: 100vw; height: calc(100vh - 60px); background: #f5f5f5;
 }
-
-.node rect {
-  fill:white;
-  stroke:black;
-  stroke-width:2px;
-  rx:6;
+.link { fill: none; stroke: #555; stroke-width: 2px; }
+.node-rect { stroke-width: 2px; cursor: pointer; }
+.node-text {
+  font-size: 12px; text-anchor: middle;
+  dominant-baseline: middle; pointer-events: none;
 }
-
-.node text {
-  font-size:12px;
-  text-anchor:middle;
-}
-
-.link {
-  fill:none;
-  stroke:black;
-  stroke-width:2px;
-}
-
 .modal {
-  position:fixed;
-  top:0; left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.5);
-  display:none;
-  justify-content:center;
-  align-items:center;
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.45); display: none;
+  justify-content: center; align-items: center; z-index: 999;
 }
-
-.modal-content {
-  background:white;
-  padding:20px;
-  border-radius:10px;
-  width:300px;
+.modal.open { display: flex; }
+.modal-box {
+  background: white; padding: 20px; border-radius: 10px;
+  width: 300px; box-shadow: 0 4px 24px rgba(0,0,0,0.2);
 }
-
-input, textarea {
-  width:100%;
-  margin-top:10px;
+.modal-box h4 { margin: 0 0 10px; font-size: 14px; color: #555; }
+.modal-box input, .modal-box textarea {
+  width: 100%; padding: 6px 8px; margin-top: 8px;
+  border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
 }
-
-button {
-  margin-top:10px;
-  width:100%;
+.modal-box .btn-group {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px;
 }
+.modal-box button {
+  padding: 7px; border-radius: 4px; border: 1px solid #bbb;
+  background: #fafafa; cursor: pointer; font-size: 12px;
+}
+.modal-box button:hover { background: #eee; }
+.modal-box button.full { grid-column: span 2; }
+.modal-box button.danger { background: #fff0f0; border-color: #e88; color: #c00; }
+.modal-box button.hidden { display: none !important; }
 </style>
 </head>
-
 <body>
 
-<h3 style="text-align:center;">🌳 Soyağacı PRO+</h3>
-
-<svg></svg>
+<h3>🌳 Soyağacı PRO+</h3>
+<div id="toolbar">
+  <button onclick="exportJSON()">💾 Dışa Aktar</button>
+  <button onclick="importJSON()">📂 İçe Aktar</button>
+  <button onclick="resetTree()">🔄 Sıfırla</button>
+</div>
+<svg id="mainSvg"></svg>
 
 <div class="modal" id="modal">
-  <div class="modal-content">
-    <input id="nameInput">
-    <textarea id="noteInput"></textarea>
-    <button onclick="save()">Kaydet</button>
-    <button onclick="addChild()">Çocuk Ekle</button>
-    <button onclick="addSpouse()">Eş Ekle</button>
-    <button onclick="addParent()">Ebeveyn Ekle</button>
-    <button onclick="deletePerson()">Sil</button>
-    <button onclick="closeModal()">Kapat</button>
+  <div class="modal-box">
+    <h4 id="modalTitle">Kişi Düzenle</h4>
+    <input id="nameInput"  placeholder="Ad Soyad">
+    <input id="birthInput" placeholder="Doğum yılı (opsiyonel)">
+    <textarea id="noteInput" placeholder="Not" rows="3"></textarea>
+    <div class="btn-group">
+      <button class="full"      onclick="save()">💾 Kaydet</button>
+      <button id="btnAddChild"  onclick="addChild()">👶 Çocuk Ekle</button>
+      <button id="btnAddSpouse" onclick="addSpouse()">💍 Eş Ekle</button>
+      <button id="btnAddParent" onclick="addParent()">👴 Ebeveyn Ekle</button>
+      <button class="danger"    onclick="deletePerson()">🗑️ Sil</button>
+      <button                   onclick="closeModal()">✖ Kapat</button>
+    </div>
   </div>
 </div>
 
 <script>
+/*
+  VERİ MODELİ
+  ───────────
+  Her kişi (Person):
+  {
+    id, name, birth, note,
+    children: Person[],        // bu kişinin çocukları
+    spouse: Person | null,     // eş (sadece isim/doğum/not — basit bağlantı)
+    spouseTree: Person | null  // eşin aile ağacının KÖKÜ (ebeveynler buraya zincir kurar)
+  }
 
-function createId(){
-  return Date.now() + Math.random();
+  Eş eklenince:
+    node.spouse     = { id, name, birth, note }   (görsel kutu)
+    node.spouseTree = null                         (başta ebeveyn yok)
+
+  Eşe ebeveyn eklenince:
+    node.spouseTree = { id:"yeniEbeveyn", children:[ eski spouseTree veya spouse referansı ] }
+    → spouse alanı HİÇ DEĞİŞMEZ → kutu kayamaz
+
+  Çizimde:
+    - Ana ağaç: d3.hierarchy(data, d => d.children)
+    - Her çiftin eş kutusu: sabit x = anaKutu.sağKenar + GAP
+    - spouseTree varsa: eşin kutusundan yukarı doğru ayrı bir zincir çizilir
+*/
+
+// ─── YARDIMCILAR ─────────────────────────────────────────────────────────────
+function uid() {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+function newPerson(name = "Yeni Kişi") {
+  return { id: uid(), name, birth: "", note: "", children: [], spouse: null, spouseTree: null };
 }
 
-let data = JSON.parse(localStorage.getItem("treeData")) || {
-  id:createId(),
-  name:"Ata",
-  note:"",
-  spouse:null,
-  children:[]
-};
+// ─── VERİ ────────────────────────────────────────────────────────────────────
+function loadData() {
+  try { return JSON.parse(localStorage.getItem("treeData4")) || null; } catch { return null; }
+}
+function saveTree() {
+  try { localStorage.setItem("treeData4", JSON.stringify(data)); }
+  catch { alert("LocalStorage doldu!"); }
+}
+let data = loadData() || newPerson("Ata");
 
-let selectedNode = null;
-let selectedType = "self";
-
-const svg = d3.select("svg");
-const g = svg.append("g");
-
-svg.call(d3.zoom().on("zoom", (e)=>{
-  g.attr("transform", e.transform);
-}));
-
-function saveTree(){
-  localStorage.setItem("treeData", JSON.stringify(data));
+// ─── TARAMA ──────────────────────────────────────────────────────────────────
+function walk(node, parent, cb) {
+  if (!node) return;
+  cb(node, parent);
+  (node.children || []).forEach(c => walk(c, node, cb));
+  if (node.spouseTree) walk(node.spouseTree, node, cb);
 }
 
-function getTextWidth(text){
-  return text.length * 7 + 20;
+function findNode(id) {
+  let r = null;
+  walk(data, null, (n, p) => { if (!r && n.id === id) r = { node: n, parent: p }; });
+  if (r) return r;
+  walk(data, null, (n) => {
+    if (!r && n.spouse && n.spouse.id === id)
+      r = { node: n.spouse, parent: n, isSpouseField: true };
+  });
+  return r;
 }
 
-function getMaxChildren(node){
-  let max = node.children ? node.children.length : 0;
-  if(node.children){
-    node.children.forEach(c=>{
-      max = Math.max(max, getMaxChildren(c));
+// Bir id'nin hangi düğümün .spouse alanında olduğunu bul
+function findSpouseOwner(id) {
+  let owner = null;
+  walk(data, null, (n) => { if (n.spouse && n.spouse.id === id) owner = n; });
+  return owner;
+}
+
+// spouseTree zincirinde en derin (en alttaki) düğümü bul — eşe en yakın olanı
+// spouseTree → children[0] → children[0] → ... → eşin doğrudan ebeveyni
+function spouseTreeLeaf(node) {
+  // Eşin spouseTree'si: zincir her zaman tek çocuklu değil olabilir,
+  // ama ebeveyn eklerken hep tek dal kurarız (children[0])
+  let cur = node.spouseTree;
+  if (!cur) return null;
+  while (cur.children && cur.children.length > 0) {
+    cur = cur.children[0];
+  }
+  return cur;
+}
+
+// ─── MODAL ───────────────────────────────────────────────────────────────────
+let selId = null;
+
+function openModal(nodeData) {
+  selId = nodeData.id;
+  const isSpouse = !!findSpouseOwner(nodeData.id);
+  const isSpouseTreeNode = isInSpouseTree(nodeData.id);
+
+  document.getElementById("modalTitle").textContent =
+    isSpouse ? "Eş Düzenle" : "Kişi Düzenle";
+  document.getElementById("nameInput").value  = nodeData.name  || "";
+  document.getElementById("birthInput").value = nodeData.birth || "";
+  document.getElementById("noteInput").value  = nodeData.note  || "";
+
+  // Sadece eşin eşi olmaz (iç içe eş yok)
+  document.getElementById("btnAddSpouse").classList.toggle("hidden", isSpouse);
+  document.getElementById("btnAddChild").classList.remove("hidden");
+
+  document.getElementById("modal").classList.add("open");
+}
+
+// Bir id'nin spouseTree zincirinde olup olmadığını kontrol et
+function isInSpouseTree(id) {
+  let found = false;
+  walk(data, null, (n) => {
+    if (n.spouseTree) {
+      walkTree(n.spouseTree, (m) => { if (m.id === id) found = true; });
+    }
+  });
+  return found;
+}
+function walkTree(node, cb) {
+  if (!node) return;
+  cb(node);
+  (node.children || []).forEach(c => walkTree(c, cb));
+}
+
+function closeModal() { document.getElementById("modal").classList.remove("open"); }
+
+function getSelected() {
+  if (!selId) return null;
+  return findNode(selId);
+}
+
+// ─── İŞLEMLER ────────────────────────────────────────────────────────────────
+function save() {
+  const info = getSelected(); if (!info) return;
+  info.node.name  = document.getElementById("nameInput").value.trim() || "İsimsiz";
+  info.node.birth = document.getElementById("birthInput").value.trim();
+  info.node.note  = document.getElementById("noteInput").value;
+  saveTree(); closeModal(); draw();
+}
+
+function addChild() {
+  const info = getSelected(); if (!info) return;
+  if (!info.node.children) info.node.children = [];
+  info.node.children.push(newPerson());
+  saveTree(); draw();
+}
+
+function addSpouse() {
+  const info = getSelected(); if (!info) return;
+  if (info.node.spouse) { alert("Zaten eşi var."); return; }
+  info.node.spouse = { id: uid(), name: "Eş", birth: "", note: "" };
+  info.node.spouseTree = null;
+  saveTree(); draw();
+}
+
+function addParent() {
+  const info = getSelected(); if (!info) return;
+  const target = info.node;
+  const newParent = newPerson("Yeni Ebeveyn");
+
+  // ── CASE 1: Hedef doğrudan .spouse alanındaki kişi ──────────────────────
+  const spOwner = findSpouseOwner(target.id);
+  if (spOwner) {
+    // Eş kutusunu HİÇ değiştirme.
+    // spouseTree'ye yeni ebeveyn ekle: spouseTree yoksa oluştur,
+    // varsa zincirin tepesine yeni ebeveyn koy.
+    const newP = newPerson("Yeni Ebeveyn");
+    if (!spOwner.spouseTree) {
+      // İlk ebeveyn: spouseTree = yeni ebeveyn (çocuksuz, sadece zincir başı)
+      spOwner.spouseTree = newP;
+    } else {
+      // Zaten bir zincir var: yeni ebeveyn mevcut spouseTree'nin üstüne geçer
+      newP.children = [spOwner.spouseTree];
+      spOwner.spouseTree = newP;
+    }
+    saveTree(); closeModal(); draw();
+    return;
+  }
+
+  // ── CASE 2: Hedef spouseTree zincirindeki bir düğüm ─────────────────────
+  // spouseTree içinde bul, üstüne yeni ebeveyn ekle
+  let handled = false;
+  walk(data, null, (n) => {
+    if (handled || !n.spouseTree) return;
+    const res = findInTree(n.spouseTree, target.id);
+    if (res) {
+      const newP = newPerson("Yeni Ebeveyn");
+      if (res.parent === null) {
+        // Zincirin kökü
+        newP.children = [n.spouseTree];
+        n.spouseTree = newP;
+      } else {
+        const idx = res.parent.children.findIndex(c => c.id === target.id);
+        if (idx !== -1) {
+          newP.children = [res.parent.children[idx]];
+          res.parent.children[idx] = newP;
+        }
+      }
+      handled = true;
+    }
+  });
+  if (handled) { saveTree(); closeModal(); draw(); return; }
+
+  // ── CASE 3: Kök düğüm ───────────────────────────────────────────────────
+  if (target.id === data.id) {
+    newParent.children = [data];
+    data = newParent;
+    saveTree(); closeModal(); draw();
+    return;
+  }
+
+  // ── CASE 4: Normal children zincirinde ──────────────────────────────────
+  const p = info.parent;
+  if (p) {
+    const idx = (p.children || []).findIndex(c => c.id === target.id);
+    if (idx !== -1) {
+      newParent.children = [p.children[idx]];
+      p.children[idx] = newParent;
+      saveTree(); closeModal(); draw();
+      return;
+    }
+  }
+
+  saveTree(); closeModal(); draw();
+}
+
+// Bir ağaçta id ara, { node, parent } döner
+function findInTree(root, id, parent = null) {
+  if (!root) return null;
+  if (root.id === id) return { node: root, parent };
+  for (const c of (root.children || [])) {
+    const r = findInTree(c, id, root);
+    if (r) return r;
+  }
+  return null;
+}
+
+function deletePerson() {
+  const info = getSelected(); if (!info) return;
+  if (!confirm("Silmek istediğine emin misin?")) return;
+  const target = info.node;
+  if (target.id === data.id) { alert("Kök ata silinemez."); return; }
+
+  // Eş mi?
+  const spOwner = findSpouseOwner(target.id);
+  if (spOwner) {
+    spOwner.spouse = null;
+    spOwner.spouseTree = null;
+    saveTree(); closeModal(); draw(); return;
+  }
+
+  // spouseTree içinde mi?
+  let handled = false;
+  walk(data, null, (n) => {
+    if (handled || !n.spouseTree) return;
+    const res = findInTree(n.spouseTree, target.id);
+    if (res) {
+      if (res.parent === null) {
+        n.spouseTree = null;
+      } else {
+        res.parent.children = (res.parent.children || []).filter(c => c.id !== target.id);
+      }
+      handled = true;
+    }
+  });
+  if (handled) { saveTree(); closeModal(); draw(); return; }
+
+  // Normal
+  const p = info.parent;
+  if (p) p.children = (p.children || []).filter(c => c.id !== target.id);
+  saveTree(); closeModal(); draw();
+}
+
+// ─── ÇİZİM ───────────────────────────────────────────────────────────────────
+const BOX_H      = 30;
+const BOX_PAD    = 16;
+const COUPLE_GAP = 40;  // eşler arası yatay boşluk
+const NODE_GAP   = 24;  // kardeşler arası yatay boşluk
+const LEVEL_H    = 110; // dikey seviye yüksekliği
+
+// Bir düğümün kutu genişliği
+function bw(node) {
+  return Math.max(60, (node.name || "").length * 7 + BOX_PAD * 2);
+}
+
+// Bir düğümün çift genişliği (ana + gap + eş)
+function cw(node) {
+  if (!node.spouse) return bw(node);
+  return bw(node) + COUPLE_GAP + bw(node.spouse);
+}
+
+/*
+  LAYOUT ALGORİTMASI
+  ──────────────────
+  Her düğüme _x (çiftin merkez x) ve _y (merkez y) atanır.
+  Bottom-up: önce yaprak düğümlerin genişlikleri hesaplanır,
+  sonra ebeveynler çocuklarının ortasına yerleştirilir.
+  
+  Her düğümün "subtree genişliği" = o düğüm dahil tüm torunların
+  kapladığı toplam yatay alan.
+*/
+
+// Bir düğümün subtree genişliğini hesapla (sadece children üzerinden)
+function subtreeWidth(node) {
+  if (!node.children || node.children.length === 0) {
+    return cw(node);
+  }
+  const childrenTotalW = node.children.reduce((sum, c) => sum + subtreeWidth(c), 0)
+                         + (node.children.length - 1) * NODE_GAP;
+  return Math.max(cw(node), childrenTotalW);
+}
+
+// Tüm ağaca x,y koordinatlarını ata
+// rootX: bu düğümün subtree'sinin sol kenarı
+// depth: kaçıncı seviye (y hesabı için)
+function assignPositions(node, left, depth) {
+  const stW = subtreeWidth(node);
+  // Bu düğümün çift merkezi: subtree'nin ortası
+  node._cx = left + stW / 2;
+  node._y  = depth * LEVEL_H;
+
+  if (node.children && node.children.length > 0) {
+    // Çocukları soldan sağa diz
+    const childrenTotalW = node.children.reduce((sum, c) => sum + subtreeWidth(c), 0)
+                           + (node.children.length - 1) * NODE_GAP;
+    // Çocuklar ebeveynin altında ortalanır
+    let curLeft = node._cx - childrenTotalW / 2;
+    node.children.forEach(child => {
+      const csw = subtreeWidth(child);
+      assignPositions(child, curLeft, depth + 1);
+      curLeft += csw + NODE_GAP;
     });
   }
-  return max;
 }
 
-function updateTree(){
+function draw() {
+  const svg = d3.select("#mainSvg");
+  svg.selectAll("*").remove();
+  const g = svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.1, 3]).on("zoom", e => g.attr("transform", e.transform)));
 
-  g.selectAll("*").remove();
+  // Pozisyon hesapla
+  assignPositions(data, 0, 0);
 
-  const root = d3.hierarchy(data);
+  // Çiz
+  drawNode(g, data);
+}
 
-  const maxChildren = getMaxChildren(data);
-  const dynamicSpacing = Math.max(150, maxChildren * 70);
+// Bir düğümü ve tüm alt ağacını çiz
+function drawNode(g, node) {
+  const cx  = node._cx;  // çiftin merkezi
+  const y   = node._y;
+  const mw  = bw(node);
+  const sw  = node.spouse ? bw(node.spouse) : 0;
+  const totalW = cw(node);
+  const lx  = cx - totalW / 2; // ana kutunun sol kenarı
 
-  const treeLayout = d3.tree().nodeSize([dynamicSpacing,200]);
-  treeLayout(root);
+  // Ana kutu
+  drawBox(g, lx, y - BOX_H/2, mw, node);
 
-  root.descendants().forEach(d=>{
-    if(d.children && d.children.length){
-      const avg = d3.mean(d.children, c => c.x);
-      d.x = avg;
+  // Eş kutusu
+  if (node.spouse) {
+    const sx = lx + mw + COUPLE_GAP;
+    g.append("line").attr("class","link")
+      .attr("x1", lx + mw).attr("y1", y)
+      .attr("x2", sx).attr("y2", y);
+    drawBox(g, sx, y - BOX_H/2, sw, node.spouse);
+
+    // Eşin spouseTree'si varsa yukarı çiz
+    if (node.spouseTree) {
+      drawSpouseAncestors(g, node.spouseTree, sx + sw/2, y);
     }
+  }
+
+  // Çocukları çiz
+  if (node.children && node.children.length > 0) {
+    drawChildLinks(g, node, cx, y);
+    node.children.forEach(child => drawNode(g, child));
+  }
+}
+
+// Ebeveyn → çocuk bağlantı çizgilerini çiz
+function drawChildLinks(g, node, parentCX, parentY) {
+  const children = node.children;
+  const sy = parentY + BOX_H/2;
+
+  if (children.length === 1) {
+    const t = children[0];
+    const ty = t._y - BOX_H/2;
+    const my = (sy + ty) / 2;
+    g.append("path").attr("class","link")
+      .attr("d", `M${parentCX},${sy} V${my} H${t._cx} V${ty}`);
+    return;
+  }
+
+  // Birden fazla çocuk: T şeklinde bağlantı
+  const firstCX = children[0]._cx;
+  const lastCX  = children[children.length - 1]._cx;
+  const ty0     = children[0]._y - BOX_H/2;
+  const my      = (sy + ty0) / 2;
+
+  // Ebeveynden yatay çizgiye inen dikey
+  g.append("line").attr("class","link")
+    .attr("x1", parentCX).attr("y1", sy)
+    .attr("x2", parentCX).attr("y2", my);
+
+  // Yatay çizgi (tüm çocukları birleştiren)
+  g.append("line").attr("class","link")
+    .attr("x1", firstCX).attr("y1", my)
+    .attr("x2", lastCX).attr("y2", my);
+
+  // Her çocuğa inen dikey
+  children.forEach(child => {
+    g.append("line").attr("class","link")
+      .attr("x1", child._cx).attr("y1", my)
+      .attr("x2", child._cx).attr("y2", child._y - BOX_H/2);
   });
+}
 
-  root.descendants().forEach(d=>{
+// Eşin ebeveyn zincirini YUKARI doğru çiz
+function drawSpouseAncestors(g, treeNode, childCenterX, childY) {
+  const nodeY  = childY - LEVEL_H;
+  const nmw    = bw(treeNode);
+  const nsw    = treeNode.spouse ? bw(treeNode.spouse) : 0;
+  const ntotal = treeNode.spouse ? nmw + COUPLE_GAP + nsw : nmw;
+  const nodeX  = childCenterX - ntotal / 2;
+  const nodeCX = childCenterX;
 
-    const gap = 60;
+  // Alt bağlantı
+  g.append("line").attr("class","link")
+    .attr("x1", childCenterX).attr("y1", childY - BOX_H/2)
+    .attr("x2", childCenterX).attr("y2", nodeY + BOX_H/2);
 
-    const mainWidth = getTextWidth(d.data.name);
-    const spouseWidth = d.data.spouse ? getTextWidth(d.data.spouse.name) : 0;
+  // Ana kutu
+  drawBox(g, nodeX, nodeY - BOX_H/2, nmw, treeNode);
 
-    d.mainWidth = mainWidth;
-    d.spouseWidth = spouseWidth;
+  // Eş kutusu
+  if (treeNode.spouse) {
+    const sx = nodeX + nmw + COUPLE_GAP;
+    g.append("line").attr("class","link")
+      .attr("x1", nodeX + nmw).attr("y1", nodeY)
+      .attr("x2", sx).attr("y2", nodeY);
+    drawBox(g, sx, nodeY - BOX_H/2, nsw, treeNode.spouse);
+    if (treeNode.spouseTree) {
+      drawSpouseAncestors(g, treeNode.spouseTree, sx + nsw/2, nodeY);
+    }
+  }
 
-    if(d.data.spouse){
-      d.totalWidth = mainWidth + gap + spouseWidth;
-    } else {
-      d.totalWidth = mainWidth;
+  // Bu ebeveynin kendi spouseTree'si (eş yoksa)
+  if (!treeNode.spouse && treeNode.spouseTree) {
+    drawSpouseAncestors(g, treeNode.spouseTree, nodeCX, nodeY);
+  }
+
+  // Bu ebeveynin çocukları AŞAĞI doğru
+  if (treeNode.children && treeNode.children.length > 0) {
+    // Çocukları nodeCX'e göre yatayda dağıt
+    const ch = treeNode.children;
+    const totalCW = ch.reduce((s, c) => s + cw(c), 0) + (ch.length - 1) * NODE_GAP;
+    let curX = nodeCX - totalCW / 2;
+    const childY2 = nodeY + LEVEL_H;
+    const sy = nodeY + BOX_H/2;
+    const my = (sy + childY2 - BOX_H/2) / 2;
+
+    if (ch.length > 1) {
+      const firstCX = curX + cw(ch[0]) / 2;
+      const lastCX  = curX + totalCW - cw(ch[ch.length-1]) / 2;
+      g.append("line").attr("class","link")
+        .attr("x1", nodeCX).attr("y1", sy)
+        .attr("x2", nodeCX).attr("y2", my);
+      g.append("line").attr("class","link")
+        .attr("x1", firstCX).attr("y1", my)
+        .attr("x2", lastCX).attr("y2", my);
     }
 
-    d.realX = d.x - d.totalWidth/2;
+    ch.forEach(child => {
+      const ccw = cw(child);
+      const ccx = curX + ccw / 2;
+      const clx = curX;
+      const cmw = bw(child);
 
-    d.linkX = d.realX + (d.mainWidth / 2);
+      if (ch.length === 1) {
+        g.append("line").attr("class","link")
+          .attr("x1", nodeCX).attr("y1", sy)
+          .attr("x2", ccx).attr("y2", childY2 - BOX_H/2);
+      } else {
+        g.append("line").attr("class","link")
+          .attr("x1", ccx).attr("y1", my)
+          .attr("x2", ccx).attr("y2", childY2 - BOX_H/2);
+      }
 
-    if(d.data.spouse){
-      d.childCenterX = d.realX + d.mainWidth + (gap / 2);
-    } else {
-      d.childCenterX = d.realX + (d.mainWidth / 2);
-    }
+      drawBox(g, clx, childY2 - BOX_H/2, cmw, child);
 
-  });
+      if (child.spouse) {
+        const csw2 = bw(child.spouse);
+        const csx = clx + cmw + COUPLE_GAP;
+        g.append("line").attr("class","link")
+          .attr("x1", clx + cmw).attr("y1", childY2)
+          .attr("x2", csx).attr("y2", childY2);
+        drawBox(g, csx, childY2 - BOX_H/2, csw2, child.spouse);
+        if (child.spouseTree) {
+          drawSpouseAncestors(g, child.spouseTree, csx + csw2/2, childY2);
+        }
+      }
 
-  g.selectAll(".link")
-    .data(root.links())
-    .enter()
-    .append("path")
-    .attr("class","link")
-    .attr("d", d=>`
-      M${d.source.childCenterX},${d.source.y}
-      V${(d.source.y + d.target.y)/2}
-      H${d.target.linkX}
-      V${d.target.y}
-    `);
-
-  const nodes = g.selectAll(".node")
-    .data(root.descendants())
-    .enter()
-    .append("g")
-    .attr("class","node")
-    .attr("transform", d=>`translate(${d.realX},${d.y})`);
-
-  nodes.each(function(d){
-
-    const gNode = d3.select(this);
-    const gap = 60;
-
-    gNode.append("rect")
-      .attr("x",0)
-      .attr("y",-15)
-      .attr("width",d.mainWidth)
-      .attr("height",30)
-      .on("click",(e)=>{
-        selectedNode = d.data;
-        selectedType = "self";
-        openModal(d.data);
-        e.stopPropagation();
-      });
-
-    gNode.append("text")
-      .attr("x",d.mainWidth/2)
-      .attr("dy",4)
-      .text(d.data.name);
-
-    if(d.data.spouse){
-
-      const startX = d.mainWidth + gap;
-
-      gNode.append("rect")
-        .attr("x",startX)
-        .attr("y",-15)
-        .attr("width",d.spouseWidth)
-        .attr("height",30)
-        .attr("fill","#ffe6e6")
-        .on("click",(e)=>{
-          selectedNode = d.data.spouse;
-          selectedType = "spouse";
-          openModal(d.data.spouse);
-          e.stopPropagation();
+      if (child.children && child.children.length > 0) {
+        // Bu çocuğun alt ağacını da çiz — assignPositions kullanmadığımız için
+        // burada basit recursive drawChildrenDown çağırıyoruz
+        child._cx = ccx; child._y = childY2;
+        drawChildLinks(g, child, ccx, childY2);
+        child.children.forEach(gc => {
+          gc._cx = gc._cx || ccx; gc._y = gc._y || childY2 + LEVEL_H;
+          drawNode(g, gc);
         });
-
-      gNode.append("text")
-        .attr("x",startX + d.spouseWidth/2)
-        .attr("dy",4)
-        .text(d.data.spouse.name);
-
-      gNode.append("line")
-        .attr("x1", d.mainWidth)
-        .attr("x2", startX)
-        .attr("y1",0)
-        .attr("y2",0)
-        .attr("stroke","black")
-        .attr("stroke-width",2);
-    }
-
-  });
-
-}
-
-// 🔥 TAM VE DOĞRU FIX
-function addParent(){
-
-  function insertParent(node){
-
-    if(!node.children) return;
-
-    node.children.forEach((c, i)=>{
-
-      // NORMAL
-      if(selectedType === "self" && c.id === selectedNode.id){
-
-        node.children[i] = {
-          id:createId(),
-          name:"Yeni Ebeveyn",
-          note:"",
-          spouse:null,
-          children:[c]
-        };
-        return;
       }
 
-      // 🔥 EŞ (ASLA ÇOCUK OLMAZ)
-      if(selectedType === "spouse" && c.spouse && c.spouse.id === selectedNode.id){
-
-        const parent = {
-          id:createId(),
-          name:"Yeni Ebeveyn",
-          note:"",
-          spouse:null,
-          children:[c.spouse] // sadece referans
-        };
-
-        node.children.push(parent); // yukarı ekle
-
-        return;
-      }
-
-      insertParent(c);
-
+      curX += ccw + NODE_GAP;
     });
   }
+}
 
-  if(selectedType === "self" && data.id === selectedNode.id){
+function drawBox(g, x, y, w, nodeData) {
+  const label = nodeData.birth
+    ? `${nodeData.name} (${nodeData.birth})`
+    : nodeData.name;
+  const short = label.length > 22 ? label.slice(0, 21) + "…" : label;
 
-    data = {
-      id:createId(),
-      name:"Yeni Ebeveyn",
-      note:"",
-      spouse:null,
-      children:[data]
+  const grp = g.append("g").style("cursor","pointer")
+    .on("click", e => { e.stopPropagation(); openModal(nodeData); });
+
+  grp.append("rect").attr("class","node-rect")
+    .attr("x", x).attr("y", y)
+    .attr("width", w).attr("height", BOX_H)
+    .attr("rx", 6)
+    .attr("fill", "white")
+    .attr("stroke", "#444");
+
+  grp.append("text").attr("class","node-text")
+    .attr("x", x + w / 2).attr("y", y + BOX_H / 2)
+    .text(short);
+}
+
+// ─── EXPORT / IMPORT / RESET ─────────────────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "soyagaci.json"; a.click();
+}
+function importJSON() {
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = ".json";
+  input.onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try { data = JSON.parse(ev.target.result); saveTree(); draw(); }
+      catch { alert("Geçersiz JSON dosyası."); }
     };
-
-  } else {
-    insertParent(data);
-  }
-
-  saveTree();
-  closeModal();
-  updateTree();
-}
-
-function openModal(person){
-  document.getElementById("nameInput").value = person.name;
-  document.getElementById("noteInput").value = person.note || "";
-  document.getElementById("modal").style.display="flex";
-}
-
-function closeModal(){
-  document.getElementById("modal").style.display="none";
-}
-
-function save(){
-  selectedNode.name = document.getElementById("nameInput").value;
-  selectedNode.note = document.getElementById("noteInput").value;
-  saveTree();
-  closeModal();
-  updateTree();
-}
-
-function addChild(){
-  if(!selectedNode.children){
-    selectedNode.children = [];
-  }
-  selectedNode.children.push({
-    id:createId(),
-    name:"Yeni Kişi",
-    note:"",
-    spouse:null,
-    children:[]
-  });
-  saveTree();
-  updateTree();
-}
-
-function addSpouse(){
-  if(selectedNode.spouse){
-    alert("Zaten eşi var");
-    return;
-  }
-  selectedNode.spouse = {
-    id:createId(),
-    name:"Eş",
-    note:""
+    reader.readAsText(file);
   };
-  saveTree();
-  updateTree();
+  input.click();
+}
+function resetTree() {
+  if (!confirm("Tüm ağaç sıfırlansın mı?")) return;
+  data = newPerson("Ata"); saveTree(); draw();
 }
 
-function deletePerson(){
-
-  if(!confirm("Silmek istediğine emin misin?")) return;
-
-  if(data === selectedNode){
-    alert("Ata silinemez");
-    return;
-  }
-
-  function removeNode(parent){
-    if(!parent.children) return;
-
-    parent.children = parent.children.filter(c => c !== selectedNode);
-    parent.children.forEach(removeNode);
-  }
-
-  removeNode(data);
-
-  saveTree();
-  closeModal();
-  updateTree();
-}
-
-updateTree();
-
+draw();
 </script>
-
 </body>
 </html>
